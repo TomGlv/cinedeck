@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CineDeck
 
-## Getting Started
+A collectible card game built on TMDB: movies, series and anime as cards. Open packs, complete sets,
+trade on an auction market against bots and other players, battle boosters, trade with friends.
 
-First, run the development server:
+Stack: Next.js 14 (App Router), Tailwind, Framer Motion, Prisma. SQLite locally, PostgreSQL in production (Netlify).
+
+## Run locally
 
 ```bash
+npm install
+cp .env.example .env        # then paste your TMDB key in TMDB_API_KEY
+npx prisma db push          # creates prisma/dev.db
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Without a TMDB key the game falls back to a few bundled sample cards (no posters).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+On Windows, stop `npm run dev` before running a Prisma command, or `prisma generate` fails with EPERM.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features
 
-## Learn More
+- **Packs**: Daily Reel (free every 15 min), Director's Cut, Blockbuster, plus **event packs** sold only during
+  their window (Fright Night: horror films, Oct 15 to Nov 3 · Holiday Reel: family films, Dec 10 to Jan 6).
+  Events live in `lib/packs.ts` (`event: { from, to, genre }`), add one there.
+- **Special prints**: any card can come out Foil (4%, x2 value), Polychrome (0.8%, x5) or Film Negative (0.12%, x15).
+  Event packs print them 3x more often. See `lib/finishes.ts`.
+- **Collection**: sets and rarity combos with coin rewards, quick sell.
+- **Market**: eBay-style auctions with proxy max bids, Buy Now, 5% tax, bots with hidden demand cycles, price history.
+- **Upgrade** (stake cards for a pricier one) and **Booster battles** (vs bot, open lobby or friend).
+- **Accounts, friends, trades**: direct card + coin swaps between friends (`/trades`), checked atomically on accept.
+- **Notifications**: outbid, auction won / sold / expired, battle invites and results, friend requests, trade offers.
+  The navbar bell polls every 15 s.
+- **Leaderboards**: collection value, sets completed, battles won (registered players, refreshed every minute).
 
-To learn more about Next.js, take a look at the following resources:
+## Deploy on Netlify
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+SQLite can't live on serverless functions, so production uses PostgreSQL. `prisma/schema.prisma` stays on SQLite
+for local dev; the Netlify build (`netlify.toml`) generates `prisma/postgres.prisma` from it with
+`scripts/postgres-schema.mjs`, builds the Prisma client for it and syncs the tables with `prisma db push`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Database.** Either:
+   - **Netlify DB** (Neon, managed by Netlify): `npx netlify db init` in the linked project. It sets
+     `NETLIFY_DATABASE_URL` and `NETLIFY_DATABASE_URL_UNPOOLED` for you, or
+   - a free **Neon** (neon.tech) or **Supabase** project: set `DATABASE_URL` (pooled connection string) and
+     `DIRECT_URL` (direct one) in *Site configuration > Environment variables*.
+2. Set `TMDB_API_KEY` and `CRON_SECRET` (any long random string) in the same place.
+3. Push the repo to GitHub and import it in Netlify, or `npx netlify deploy --prod`. Netlify picks up `netlify.toml`.
 
-## Deploy on Vercel
+`netlify/functions/market-tick.mjs` is a scheduled function that calls `/api/cron/tick` every 5 minutes, so auctions
+settle and bots keep trading when nobody is on the site.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+If the build ever refuses a schema change because it would delete data, `prisma db push` stops the deploy rather
+than dropping anything: handle that change by hand.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Move your local data to production (optional)
+
+Copies every row of `prisma/dev.db` (accounts, cards, market history) into the Postgres database:
+
+```bash
+# with DATABASE_URL / DIRECT_URL pointing at Postgres in your shell (not in .env, which stays on SQLite)
+node scripts/postgres-schema.mjs
+npx prisma generate --schema prisma/postgres.prisma
+npx prisma db push --schema prisma/postgres.prisma --skip-generate
+node scripts/copy-sqlite-to-postgres.mjs
+npx prisma generate          # back to the SQLite client for local dev
+```
+
+The copy script needs Node 22.5+ (built-in `node:sqlite`).

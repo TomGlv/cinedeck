@@ -1,0 +1,293 @@
+generator client {
+  provider      = "prisma-client-js"
+  /// rhel-openssl-3.0.x = Netlify / AWS Lambda functions
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// A guest (cookie only) until it registers a username + password.
+/// The single isBot player ("house") owns every copy held by the bots.
+model Player {
+  id             String         @id @default(cuid())
+  /// Display name as typed; null for guests
+  username       String?        @unique
+  /// Lowercased username, for case-insensitive uniqueness and lookup
+  usernameKey    String?        @unique
+  passwordHash   String?
+  isBot          Boolean        @default(false)
+  cineCoins      Int            @default(1000)
+  lastFreePackAt DateTime?
+  createdAt      DateTime       @default(now())
+  cards          OwnedCard[]
+  completedSets  CompletedSet[]
+  listings       Listing[]      @relation("SellerListings")
+  bids           Listing[]      @relation("BidderListings")
+  bidHistory     Bid[]
+  sessions       Session[]
+  sentRequests   Friendship[]   @relation("FriendRequester")
+  gotRequests    Friendship[]   @relation("FriendAddressee")
+  battlesCreated Battle[]       @relation("BattleCreator")
+  battlesJoined  Battle[]       @relation("BattleOpponent")
+  battlesInvited Battle[]       @relation("BattleInvited")
+  notifications  Notification[]
+  tradesSent     Trade[]        @relation("TradeSender")
+  tradesReceived Trade[]        @relation("TradeReceiver")
+}
+
+/// Login session; the cookie holds the random token.
+model Session {
+  token     String   @id
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([playerId])
+}
+
+/// Friend request; becomes a friendship once accepted.
+model Friendship {
+  id          String   @id @default(cuid())
+  requesterId String
+  requester   Player   @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addresseeId String
+  addressee   Player   @relation("FriendAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+  /// pending | accepted
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+}
+
+/// Booster battle lobby. Both sides pay the same pack; the winner gets all 10 cards.
+model Battle {
+  id            String    @id @default(cuid())
+  /// premium | blockbuster
+  pack          String
+  /// classic | underdog
+  mode          String
+  creatorId     String
+  creator       Player    @relation("BattleCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  /// null with a name = bot opponent
+  opponentId    String?
+  opponent      Player?   @relation("BattleOpponent", fields: [opponentId], references: [id], onDelete: SetNull)
+  opponentName  String?
+  /// Friend challenge: only this player may join
+  invitedId     String?
+  invited       Player?   @relation("BattleInvited", fields: [invitedId], references: [id], onDelete: SetNull)
+  /// open | done | cancelled
+  status        String    @default("open")
+  /// JSON CardData[], hidden until the battle is done
+  creatorCards  String
+  opponentCards String?
+  /// JSON number[] market values at resolution, same order as the cards
+  creatorValues  String?
+  opponentValues String?
+  creatorTotal  Int?
+  opponentTotal Int?
+  /// "creator" | "opponent"
+  winner        String?
+  /// The creator has watched the result (for the "new result" badge)
+  creatorSeen   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@index([status, createdAt])
+  @@index([creatorId])
+  @@index([invitedId, status])
+}
+
+/// A card copy in a player's collection. Duplicates are allowed (one row per copy).
+model OwnedCard {
+  id        String   @id @default(cuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  /// CardData.id, e.g. "movie-11"; "special-*" cards are untradeable rewards
+  cardId    String
+  tmdbId    Int
+  title     String
+  poster    String?
+  type      String
+  rating    Float
+  year      Int?
+  franchise String?
+  rarity    String
+  /// normal | foil | polychrome | negative (lib/finishes.ts)
+  finish    String   @default("normal")
+  pulledAt  DateTime @default(now())
+  /// Set only while the copy is on the transfer market
+  listing   Listing?
+
+  @@index([playerId])
+  @@index([playerId, franchise])
+}
+
+/// Claimed one-time reward: a franchise set or a rarity combo.
+model CompletedSet {
+  id          String   @id @default(cuid())
+  playerId    String
+  player      Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  /// Franchise slug (lib/franchises.ts) or combo slug (lib/combos.ts)
+  slug        String
+  completedAt DateTime @default(now())
+
+  @@unique([playerId, slug])
+}
+
+/// Transfer market auction. sellerId null = bot listing.
+model Listing {
+  id           String     @id @default(cuid())
+  cardId       String
+  /// Linked only while active; cleared when sold, expired or cancelled
+  ownedCardId  String?    @unique
+  ownedCard    OwnedCard? @relation(fields: [ownedCardId], references: [id], onDelete: SetNull)
+  sellerId     String?
+  seller       Player?    @relation("SellerListings", fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerName   String
+
+  // Card snapshot (bot listings have no OwnedCard)
+  tmdbId       Int
+  title        String
+  poster       String?
+  type         String
+  rating       Float
+  year         Int?
+  franchise    String?
+  rarity       String
+  finish       String     @default("normal")
+
+  startPrice   Int
+  buyNowPrice  Int
+  /// Visible price. A human leader's whole maxBid is held in escrow until outbid or the auction ends
+  currentBid   Int?
+  /// Leader's hidden proxy ceiling (eBay-style auto-bid); null on legacy rows = currentBid
+  maxBid       Int?
+  bidCount     Int        @default(0)
+  /// JSON BotInterest[]: bots watching this auction and the most each will pay
+  bots         String?
+  /// null with a currentBid = a bot is winning
+  bidderId     String?
+  bidder       Player?    @relation("BidderListings", fields: [bidderId], references: [id], onDelete: SetNull)
+  bidderName   String?
+  history      Bid[]
+
+  /// active | sold | expired | cancelled
+  status       String     @default("active")
+  soldPrice    Int?
+  buyerId      String?
+  buyerName    String?
+  endsAt       DateTime
+  lastBotCheck DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([status, endsAt])
+  @@index([sellerId])
+  @@index([bidderId])
+}
+
+/// One bid on a listing, including proxy auto-bids. bidderId null = bot.
+model Bid {
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  bidderId   String?
+  bidder     Player?  @relation(fields: [bidderId], references: [id], onDelete: SetNull)
+  bidderName String
+  amount     Int
+  /// Placed automatically by the bidder's max bid
+  auto       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([listingId, createdAt])
+  @@index([bidderId])
+}
+
+/// Price history for the market ("bourse").
+model Sale {
+  id        String   @id @default(cuid())
+  cardId    String
+  price     Int
+  title     String   @default("")
+  rarity    String   @default("Common")
+  /// Prices of special finishes are divided by their multiplier when computing market values
+  finish    String   @default("normal")
+  poster    String?
+  buyerName String?
+  soldAt    DateTime @default(now())
+
+  @@index([cardId, soldAt])
+  @@index([soldAt])
+}
+
+/// In-app notification (outbid, sold, battle invite, trade offer...).
+model Notification {
+  id        String   @id @default(cuid())
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  /// outbid | won | sold | expired | battle_invite | battle_result | friend_request | friend_accepted | trade_offer | trade_accepted | trade_declined
+  kind      String
+  title     String
+  body      String   @default("")
+  /// Page to open when clicked
+  link      String?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([playerId, read, createdAt])
+}
+
+/// Direct trade offer between two friends: cards and/or coins both ways.
+model Trade {
+  id             String      @id @default(cuid())
+  senderId       String
+  sender         Player      @relation("TradeSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId     String
+  receiver       Player      @relation("TradeReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  /// Coins the sender adds / asks for
+  offerCoins     Int         @default(0)
+  requestCoins   Int         @default(0)
+  message        String      @default("")
+  /// pending | accepted | declined | cancelled | failed
+  status         String      @default("pending")
+  createdAt      DateTime    @default(now())
+  resolvedAt     DateTime?
+  items          TradeItem[]
+
+  @@index([receiverId, status])
+  @@index([senderId, status])
+}
+
+/// One card copy in a trade. Snapshot kept so history still shows it after the copy moved.
+model TradeItem {
+  id          String  @id @default(cuid())
+  tradeId     String
+  trade       Trade   @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  /// offer = from the sender · request = from the receiver
+  side        String
+  ownedCardId String
+  cardId      String
+  tmdbId      Int
+  title       String
+  poster      String?
+  type        String
+  rating      Float
+  year        Int?
+  franchise   String?
+  rarity      String
+  finish      String  @default("normal")
+
+  @@index([tradeId])
+  @@index([ownedCardId])
+}
+
+/// Last run of a periodic job (house restock, background trades). Stored in the DB so
+/// serverless instances share it instead of each keeping its own in-memory timer.
+model Clock {
+  key String   @id
+  at  DateTime
+}
