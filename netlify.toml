@@ -1,8 +1,9 @@
 # Netlify detects Next.js and runs it with its Next.js runtime (OpenNext adapter).
-# Production uses PostgreSQL: the build turns prisma/schema.prisma (SQLite, local dev)
-# into prisma/postgres.prisma, generates the client for it and syncs the tables.
+# Production uses Netlify Database (Postgres): the SQL in netlify/database/migrations is applied
+# on deploy, and the build only generates the Prisma client for Postgres from
+# prisma/schema.prisma (which stays on SQLite for local dev).
 [build]
-  command = "node scripts/postgres-schema.mjs && npx prisma generate --schema prisma/postgres.prisma && npx prisma db push --schema prisma/postgres.prisma --skip-generate && npx next build"
+  command = "node scripts/postgres-schema.mjs && npx prisma generate --schema prisma/postgres.prisma && npx next build"
   publish = ".next"
 
 [build.environment]
