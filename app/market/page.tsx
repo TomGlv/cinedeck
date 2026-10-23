@@ -1,6 +1,14 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { MarketView } from "@/components/market/MarketView";
 
-/** The market moved to the home page; keep old links working. */
+export const metadata = { title: "Market · CineDeck" };
+
 export default function MarketPage() {
-  redirect("/");
+  return (
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+      <Suspense>
+        <MarketView />
+      </Suspense>
+    </main>
+  );
 }

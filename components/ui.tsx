@@ -55,16 +55,18 @@ export function Modal({ open, onClose, children }: { open: boolean; onClose: () 
             animate={{ y: 0, scale: 1, opacity: 1 }}
             exit={{ y: 60, opacity: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 26 }}
-            className="relative max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-zinc-950/95 p-5 ring-1 ring-white/10 sm:rounded-3xl sm:p-7"
+            className="w-full max-w-3xl rounded-t-[2rem] bg-white/[0.04] p-1.5 ring-1 ring-white/10 sm:rounded-[2rem]"
           >
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="absolute right-3 top-3 z-10 rounded-full p-2 text-zinc-400 hover:bg-white/10 hover:text-white"
-            >
-              <X className="h-5 w-5" />
-            </button>
-            {children}
+            <div className="relative max-h-[90vh] overflow-y-auto rounded-t-[calc(2rem-0.375rem)] bg-zinc-950 p-5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)] sm:rounded-[calc(2rem-0.375rem)] sm:p-7">
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="absolute right-3 top-3 z-10 rounded-full p-2 text-zinc-400 transition hover:bg-white/10 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+              {children}
+            </div>
           </motion.div>
         </motion.div>
       )}
@@ -129,7 +131,7 @@ export function ToastStack({ toasts }: { toasts: Toast[] }) {
 /* ------------------------------------------------------------------ */
 
 const RARITY_CHIP: Record<Rarity, string> = {
-  Mythic: "data-[on=true]:bg-gradient-to-r data-[on=true]:from-amber-300 data-[on=true]:to-fuchsia-500 data-[on=true]:text-black",
+  Mythic: "data-[on=true]:bg-gradient-to-r data-[on=true]:from-rose-400 data-[on=true]:to-red-600 data-[on=true]:text-white",
   Legendary: "data-[on=true]:bg-amber-400 data-[on=true]:text-black",
   Rare: "data-[on=true]:bg-violet-500 data-[on=true]:text-white",
   Common: "data-[on=true]:bg-zinc-500 data-[on=true]:text-white",
@@ -169,7 +171,7 @@ export function SearchInput({ value, onChange, placeholder }: { value: string; o
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-full bg-white/5 py-2 pl-9 pr-4 text-sm text-zinc-100 ring-1 ring-white/10 placeholder:text-zinc-500 focus:outline-none focus:ring-violet-400/60"
+        className="w-full rounded-full bg-white/5 py-2 pl-9 pr-4 text-sm text-zinc-100 ring-1 ring-white/10 placeholder:text-zinc-500 focus:outline-none focus:ring-accent-400/60"
       />
     </label>
   );
@@ -191,7 +193,7 @@ export function Select<T extends string>({
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value as T)}
-      className="rounded-full bg-white/5 px-3 py-2 text-sm text-zinc-200 ring-1 ring-white/10 focus:outline-none focus:ring-violet-400/60 [&>option]:bg-zinc-900"
+      className="rounded-full bg-white/5 px-3 py-2 text-sm text-zinc-200 ring-1 ring-white/10 focus:outline-none focus:ring-accent-400/60 [&>option]:bg-zinc-900"
     >
       {options.map((o) => (
         <option key={o.value} value={o.value}>

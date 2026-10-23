@@ -6,7 +6,7 @@ import { FINISHES } from "@/lib/finishes";
 import { CoinAmount } from "./ui";
 
 const RARITY_RING: Record<Rarity, string> = {
-  Mythic: "ring-fuchsia-400",
+  Mythic: "ring-red-500",
   Legendary: "ring-amber-400",
   Rare: "ring-violet-500",
   Common: "ring-zinc-600",
@@ -15,7 +15,7 @@ const RARITY_RING: Record<Rarity, string> = {
 const FINISH_CHIP = {
   foil: "bg-gradient-to-r from-slate-100 to-slate-400 text-black",
   polychrome: "finish-rainbow text-black",
-  negative: "bg-orange-400 text-black",
+  negative: "bg-zinc-100 text-black",
 } as const;
 
 /** Small poster tile for pickers (upgrader, trades). */
@@ -50,7 +50,7 @@ export function CardThumb({
             alt=""
             loading="lazy"
             className="h-full w-full object-cover"
-            style={finish === "negative" ? { filter: "invert(1) hue-rotate(180deg)" } : undefined}
+            style={finish === "negative" ? { filter: "invert(1) contrast(1.15)" } : undefined}
           />
         ) : (
           <div className="flex h-full items-center justify-center p-1 text-center text-[9px] text-zinc-400">{card.title}</div>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Boxes, Calendar, Clapperboard, Clock, DollarSign, Landmark, Star, TrendingUp, Tv, Users } from "lucide-react";
 import type { CardData, CardDetails } from "@/lib/cards";
 import { CardInfoContext } from "./card-info";
+import { FavoriteButton } from "./FavoriteButton";
 import { MovieCard } from "./MovieCard";
 import { Modal } from "./ui";
 
@@ -241,6 +242,7 @@ export function CardInfoProvider({ children }: { children: ReactNode }) {
                   {card.releaseDate ? ` · ${card.releaseDate}` : ""} · {card.rarity}
                 </p>
               </div>
+              <FavoriteButton cardId={card.id} />
               <CardDetailsPanel card={card} />
             </div>
           </div>

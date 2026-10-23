@@ -28,10 +28,10 @@ export const RARITY_FX: Record<
     label: "Legendary!",
   },
   Mythic: {
-    colors: ["#f0abfc", "#a78bfa", "#67e8f9", "#fde68a", "#ffffff", "#f472b6"],
-    glow: "rgba(217,70,239,0.9)",
+    colors: ["#ffffff", "#fecdd3", "#fb7185", "#ef4444", "#be123c"],
+    glow: "rgba(239,68,68,0.85)",
     particles: 52,
-    rays: "conic-gradient(from 0deg, #f0abfc55, transparent 15deg, #67e8f955 30deg, transparent 45deg, #fde68a55 60deg, transparent 75deg, #a78bfa55 90deg, transparent 105deg, #f472b655 120deg, transparent 135deg, #67e8f955 150deg, transparent 165deg, #fde68a55 180deg, transparent 195deg, #f0abfc55 210deg, transparent 225deg, #a78bfa55 240deg, transparent 255deg, #67e8f955 270deg, transparent 285deg, #fde68a55 300deg, transparent 315deg, #f472b655 330deg, transparent 345deg)",
+    rays: "conic-gradient(from 0deg, #ef444455, transparent 15deg, #fecdd355 30deg, transparent 45deg, #fb718555 60deg, transparent 75deg, #ef444455 90deg, transparent 105deg, #fecdd355 120deg, transparent 135deg, #be123c55 150deg, transparent 165deg, #ef444455 180deg, transparent 195deg, #fecdd355 210deg, transparent 225deg, #fb718555 240deg, transparent 255deg, #ef444455 270deg, transparent 285deg, #fecdd355 300deg, transparent 315deg, #be123c55 330deg, transparent 345deg)",
     label: "MYTHIC PULL!",
   },
 };
@@ -49,9 +49,9 @@ export const FINISH_FX: Record<Exclude<Finish, "normal">, { label: string; text:
     flash: "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(232,121,249,0.5) 30%, rgba(163,230,53,0.3) 50%, rgba(34,211,238,0.2) 65%, transparent 80%)",
   },
   negative: {
-    label: "FILM NEGATIVE!!!",
-    text: "from-orange-200 via-orange-400 to-amber-600",
-    flash: "radial-gradient(circle, rgba(255,237,213,0.95) 0%, rgba(251,146,60,0.6) 35%, rgba(0,0,0,0.4) 65%, transparent 85%)",
+    label: "NEGATIVE!!!",
+    text: "from-zinc-100 via-indigo-200 to-violet-400",
+    flash: "radial-gradient(circle, rgba(10,10,25,0.92) 0%, rgba(99,102,241,0.5) 35%, rgba(255,255,255,0.22) 60%, transparent 85%)",
   },
 };
 

@@ -5,7 +5,7 @@ import { snapshotToCard, type MediaType, type Rarity } from "./cards";
 import { COMBOS, comboProgress, getCombo, type OwnedSummary } from "./combos";
 import { isTradeable, quickSellPrice, type CollectionDTO, type OwnedGroupDTO } from "./economy";
 import { FRANCHISES, getFranchise } from "./franchises";
-import { cardKey } from "./finishes";
+import { cardKey, finishOf } from "./finishes";
 import { MarketError, getMarketValues } from "./market";
 import { getPlayerState } from "./player";
 import { getSetCards } from "./sets";
@@ -40,6 +40,8 @@ export async function getCollection(playerId: string): Promise<CollectionDTO> {
       };
       groupsById.set(cardKey(c), group);
     }
+    // Older copies may predate the poster: show the group with any copy's poster
+    if (!group.card.poster && c.poster) group.card = { ...group.card, poster: c.poster };
     group.copies.push({ id: c.id, listed: c.listing != null });
   }
   const groups = Array.from(groupsById.values());
@@ -58,6 +60,7 @@ export async function getCollection(playerId: string): Promise<CollectionDTO> {
     return {
       slug: f.slug,
       name: f.name,
+      description: f.description,
       cards,
       owned,
       total: cards.length,
@@ -65,10 +68,12 @@ export async function getCollection(playerId: string): Promise<CollectionDTO> {
       claimed: claimed.has(f.slug),
       bonus: f.bonus,
     };
-  });
+  }).filter((s) => s.total > 0);
 
-  const summaries: OwnedSummary[] = groups.map((g) => ({ cardId: g.card.id, rarity: g.card.rarity, type: g.card.type }));
-  const combos = COMBOS.map((c) => ({
+  const summaries: OwnedSummary[] = groups.map((g) => ({ cardId: g.card.id, rarity: g.card.rarity, type: g.card.type, finish: g.card.finish }));
+  // The chain: everything up to the first unclaimed combo is open, the rest is locked
+  const current = COMBOS.findIndex((c) => !claimed.has(c.slug));
+  const combos = COMBOS.map((c, i) => ({
     slug: c.slug,
     name: c.name,
     description: c.description,
@@ -77,6 +82,7 @@ export async function getCollection(playerId: string): Promise<CollectionDTO> {
     target: c.target,
     reward: c.reward,
     claimed: claimed.has(c.slug),
+    locked: current !== -1 && i > current,
   }));
 
   return { groups, sets, combos, state };
@@ -88,10 +94,10 @@ export async function claimReward(playerId: string, slug: string): Promise<{ coi
   const combo = getCombo(slug);
   if (!franchise && !combo) throw new MarketError("Unknown set");
 
+  // Every copy, not one per card: a print combo needs to see the foil next to the normal copy
   const copies = await prisma.ownedCard.findMany({
     where: { playerId },
-    distinct: ["cardId"],
-    select: { cardId: true, rarity: true, type: true },
+    select: { cardId: true, rarity: true, type: true, finish: true },
   });
   const owned = new Set(copies.map((c) => c.cardId));
 
@@ -99,7 +105,10 @@ export async function claimReward(playerId: string, slug: string): Promise<{ coi
     const cards = (await getSetCards()).get(slug) ?? [];
     if (cards.length === 0 || !cards.every((c) => owned.has(c.id))) throw new MarketError("Set not complete yet");
   } else if (combo) {
-    const summaries = copies.map((c) => ({ cardId: c.cardId, rarity: c.rarity as Rarity, type: c.type as MediaType }));
+    const done = new Set((await prisma.completedSet.findMany({ where: { playerId }, select: { slug: true } })).map((r) => r.slug));
+    const before = COMBOS.slice(0, COMBOS.indexOf(combo));
+    if (before.some((c) => !done.has(c.slug))) throw new MarketError("Claim the previous combos first");
+    const summaries = copies.map((c) => ({ cardId: c.cardId, rarity: c.rarity as Rarity, type: c.type as MediaType, finish: finishOf(c.finish) }));
     if (comboProgress(combo, summaries) < combo.target) throw new MarketError("Combo not complete yet");
   }
 

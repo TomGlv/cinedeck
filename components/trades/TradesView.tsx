@@ -267,7 +267,7 @@ function Builder({ friends, initialFriend, onSent }: { friends: string[]; initia
       <div className="flex flex-col items-center gap-3 rounded-3xl bg-white/[0.03] p-8 text-center ring-1 ring-white/10">
         <UserPlus className="h-8 w-8 text-zinc-500" />
         <p className="text-sm text-zinc-400">Trades are between friends. Add someone first.</p>
-        <Link href="/friends" className="rounded-full bg-violet-500 px-5 py-2 text-sm font-bold text-white">
+        <Link href="/friends" className="rounded-full bg-accent-500 px-5 py-2 text-sm font-bold text-white">
           Find friends
         </Link>
       </div>
@@ -298,12 +298,12 @@ function Builder({ friends, initialFriend, onSent }: { friends: string[]; initia
           value={message}
           onChange={(e) => setMessage(e.target.value.slice(0, 140))}
           placeholder="Add a message (optional)"
-          className="min-w-0 flex-1 rounded-full bg-white/5 px-4 py-2.5 text-sm text-zinc-100 ring-1 ring-white/10 placeholder:text-zinc-500 focus:outline-none focus:ring-violet-400/60"
+          className="min-w-0 flex-1 rounded-full bg-white/5 px-4 py-2.5 text-sm text-zinc-100 ring-1 ring-white/10 placeholder:text-zinc-500 focus:outline-none focus:ring-accent-400/60"
         />
         <button
           onClick={send}
           disabled={busy || empty || !friend}
-          className="flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50"
+          className="flex items-center justify-center gap-2 rounded-full bg-accent-500 hover:bg-accent-400 px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50"
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send offer
         </button>
@@ -359,7 +359,7 @@ export function TradesView() {
       <div className="mx-auto flex max-w-md flex-col items-center gap-4 py-16 text-center">
         <ArrowLeftRight className="h-10 w-10 text-zinc-500" />
         <p className="text-zinc-400">Create an account to add friends and trade cards with them.</p>
-        <Link href="/login" className="rounded-full bg-violet-500 px-5 py-2.5 text-sm font-bold text-white">
+        <Link href="/login" className="rounded-full bg-accent-500 px-5 py-2.5 text-sm font-bold text-white">
           Sign up
         </Link>
       </div>

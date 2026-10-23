@@ -20,7 +20,11 @@ model Player {
   passwordHash   String?
   isBot          Boolean        @default(false)
   cineCoins      Int            @default(1000)
+  /// Redeemed the unlimited code: the balance is kept topped up (lib/codes.ts)
+  unlimitedCoins Boolean        @default(false)
   lastFreePackAt DateTime?
+  /// OwnedCard shown as the profile picture (must still be theirs)
+  avatarCardId   String?
   createdAt      DateTime       @default(now())
   cards          OwnedCard[]
   completedSets  CompletedSet[]
@@ -36,6 +40,20 @@ model Player {
   notifications  Notification[]
   tradesSent     Trade[]        @relation("TradeSender")
   tradesReceived Trade[]        @relation("TradeReceiver")
+  redeemedCodes  RedeemedCode[]
+  favorites      Favorite[]
+}
+
+/// Promo code used by a player, with its use count.
+model RedeemedCode {
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  code      String
+  /// Times this player redeemed it (codes can allow several uses)
+  uses      Int      @default(1)
+  createdAt DateTime @default(now())
+
+  @@id([playerId, code])
 }
 
 /// Login session; the cookie holds the random token.
@@ -65,36 +83,36 @@ model Friendship {
 
 /// Booster battle lobby. Both sides pay the same pack; the winner gets all 10 cards.
 model Battle {
-  id            String    @id @default(cuid())
+  id             String    @id @default(cuid())
   /// premium | blockbuster
-  pack          String
+  pack           String
   /// classic | underdog
-  mode          String
-  creatorId     String
-  creator       Player    @relation("BattleCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  mode           String
+  creatorId      String
+  creator        Player    @relation("BattleCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   /// null with a name = bot opponent
-  opponentId    String?
-  opponent      Player?   @relation("BattleOpponent", fields: [opponentId], references: [id], onDelete: SetNull)
-  opponentName  String?
+  opponentId     String?
+  opponent       Player?   @relation("BattleOpponent", fields: [opponentId], references: [id], onDelete: SetNull)
+  opponentName   String?
   /// Friend challenge: only this player may join
-  invitedId     String?
-  invited       Player?   @relation("BattleInvited", fields: [invitedId], references: [id], onDelete: SetNull)
+  invitedId      String?
+  invited        Player?   @relation("BattleInvited", fields: [invitedId], references: [id], onDelete: SetNull)
   /// open | done | cancelled
-  status        String    @default("open")
+  status         String    @default("open")
   /// JSON CardData[], hidden until the battle is done
-  creatorCards  String
-  opponentCards String?
+  creatorCards   String
+  opponentCards  String?
   /// JSON number[] market values at resolution, same order as the cards
   creatorValues  String?
   opponentValues String?
-  creatorTotal  Int?
-  opponentTotal Int?
+  creatorTotal   Int?
+  opponentTotal  Int?
   /// "creator" | "opponent"
-  winner        String?
+  winner         String?
   /// The creator has watched the result (for the "new result" badge)
-  creatorSeen   Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  finishedAt    DateTime?
+  creatorSeen    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
 
   @@index([status, createdAt])
   @@index([creatorId])
@@ -140,50 +158,50 @@ model CompletedSet {
 
 /// Transfer market auction. sellerId null = bot listing.
 model Listing {
-  id           String     @id @default(cuid())
-  cardId       String
+  id          String     @id @default(cuid())
+  cardId      String
   /// Linked only while active; cleared when sold, expired or cancelled
-  ownedCardId  String?    @unique
-  ownedCard    OwnedCard? @relation(fields: [ownedCardId], references: [id], onDelete: SetNull)
-  sellerId     String?
-  seller       Player?    @relation("SellerListings", fields: [sellerId], references: [id], onDelete: Cascade)
-  sellerName   String
+  ownedCardId String?    @unique
+  ownedCard   OwnedCard? @relation(fields: [ownedCardId], references: [id], onDelete: SetNull)
+  sellerId    String?
+  seller      Player?    @relation("SellerListings", fields: [sellerId], references: [id], onDelete: Cascade)
+  sellerName  String
 
   // Card snapshot (bot listings have no OwnedCard)
-  tmdbId       Int
-  title        String
-  poster       String?
-  type         String
-  rating       Float
-  year         Int?
-  franchise    String?
-  rarity       String
-  finish       String     @default("normal")
+  tmdbId    Int
+  title     String
+  poster    String?
+  type      String
+  rating    Float
+  year      Int?
+  franchise String?
+  rarity    String
+  finish    String  @default("normal")
 
-  startPrice   Int
-  buyNowPrice  Int
+  startPrice  Int
+  buyNowPrice Int
   /// Visible price. A human leader's whole maxBid is held in escrow until outbid or the auction ends
-  currentBid   Int?
+  currentBid  Int?
   /// Leader's hidden proxy ceiling (eBay-style auto-bid); null on legacy rows = currentBid
-  maxBid       Int?
-  bidCount     Int        @default(0)
+  maxBid      Int?
+  bidCount    Int     @default(0)
   /// JSON BotInterest[]: bots watching this auction and the most each will pay
-  bots         String?
+  bots        String?
   /// null with a currentBid = a bot is winning
-  bidderId     String?
-  bidder       Player?    @relation("BidderListings", fields: [bidderId], references: [id], onDelete: SetNull)
-  bidderName   String?
-  history      Bid[]
+  bidderId    String?
+  bidder      Player? @relation("BidderListings", fields: [bidderId], references: [id], onDelete: SetNull)
+  bidderName  String?
+  history     Bid[]
 
   /// active | sold | expired | cancelled
-  status       String     @default("active")
+  status       String   @default("active")
   soldPrice    Int?
   buyerId      String?
   buyerName    String?
   endsAt       DateTime
-  lastBotCheck DateTime   @default(now())
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  lastBotCheck DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([status, endsAt])
   @@index([sellerId])
@@ -243,20 +261,20 @@ model Notification {
 
 /// Direct trade offer between two friends: cards and/or coins both ways.
 model Trade {
-  id             String      @id @default(cuid())
-  senderId       String
-  sender         Player      @relation("TradeSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiverId     String
-  receiver       Player      @relation("TradeReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  id           String      @id @default(cuid())
+  senderId     String
+  sender       Player      @relation("TradeSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId   String
+  receiver     Player      @relation("TradeReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
   /// Coins the sender adds / asks for
-  offerCoins     Int         @default(0)
-  requestCoins   Int         @default(0)
-  message        String      @default("")
+  offerCoins   Int         @default(0)
+  requestCoins Int         @default(0)
+  message      String      @default("")
   /// pending | accepted | declined | cancelled | failed
-  status         String      @default("pending")
-  createdAt      DateTime    @default(now())
-  resolvedAt     DateTime?
-  items          TradeItem[]
+  status       String      @default("pending")
+  createdAt    DateTime    @default(now())
+  resolvedAt   DateTime?
+  items        TradeItem[]
 
   @@index([receiverId, status])
   @@index([senderId, status])
@@ -290,4 +308,15 @@ model TradeItem {
 model Clock {
   key String   @id
   at  DateTime
+}
+
+/// Card a player watches: they're told when it goes on sale (lib/favorites.ts).
+model Favorite {
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  cardId    String
+  createdAt DateTime @default(now())
+
+  @@id([playerId, cardId])
+  @@index([cardId])
 }

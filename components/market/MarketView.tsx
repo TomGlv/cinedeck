@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Gavel, Loader2, Store, Tag } from "lucide-react";
-import type { MediaType, Rarity } from "@/lib/cards";
+import { TYPE_OPTIONS, type MediaType, type Rarity } from "@/lib/cards";
 import { afterTax, type ListingDTO, type MarketDTO } from "@/lib/economy";
+import type { Finish } from "@/lib/finishes";
 import { sfx } from "@/lib/sfx";
 import { usePlayer } from "../PlayerProvider";
 import { RarityChips, SearchInput, Select, ToastStack, useToasts } from "../ui";
@@ -16,6 +17,23 @@ import { ListingTile } from "./ListingTile";
 
 type Tab = "browse" | "mine" | "bids";
 type Sort = "ending" | "priceAsc" | "priceDesc" | "deal";
+type PrintFilter = "all" | "normal" | "special" | Exclude<Finish, "normal">;
+
+const PRINT_OPTIONS: { value: PrintFilter; label: string }[] = [
+  { value: "all", label: "All prints" },
+  { value: "normal", label: "Normal" },
+  { value: "special", label: "Any special print" },
+  { value: "foil", label: "Foil" },
+  { value: "polychrome", label: "Polychrome" },
+  { value: "negative", label: "Negative" },
+];
+
+function matchesPrint(finish: Finish | undefined, filter: PrintFilter): boolean {
+  const f = finish ?? "normal";
+  if (filter === "all") return true;
+  if (filter === "special") return f !== "normal";
+  return f === filter;
+}
 
 const POLL_MS = 4000;
 
@@ -32,12 +50,15 @@ export function MarketView() {
   const { toasts, push } = useToasts();
   const [data, setData] = useState<MarketDTO | null>(null);
   const [tab, setTab] = useState<Tab>("browse");
-  // Notification links open a tab: /?tab=mine, /?tab=bids
+  // Links open a tab (/market?tab=mine) or one card's listings (/market?card=star-x, from the showcase)
   const params = useSearchParams();
+  const [cardFilter, setCardFilter] = useState<string | null>(null);
   useEffect(() => {
     const asked = params.get("tab");
     if (asked === "browse" || asked === "mine" || asked === "bids") setTab(asked);
+    setCardFilter(params.get("card"));
   }, [params]);
+  const [print, setPrint] = useState<PrintFilter>("all");
   const [rarity, setRarity] = useState<Rarity | "all">("all");
   const [type, setType] = useState<MediaType | "all">("all");
   const [query, setQuery] = useState("");
@@ -103,8 +124,11 @@ export function MarketView() {
       .filter((l) => rarity === "all" || l.card.rarity === rarity)
       .filter((l) => type === "all" || l.card.type === type)
       .filter((l) => !q || l.card.title.toLowerCase().includes(q))
+      .filter((l) => !cardFilter || l.card.id === cardFilter)
+      .filter((l) => matchesPrint(l.card.finish, print))
       .sort(tab === "browse" ? SORTERS[sort] : () => 0);
-  }, [data, tab, rarity, type, query, sort]);
+  }, [data, tab, rarity, type, query, sort, cardFilter, print]);
+  const filteredCard = cardFilter ? [...(data?.browse ?? [])].find((l) => l.card.id === cardFilter)?.card : null;
 
   const all = data ? [...data.browse, ...data.mine, ...data.bids] : [];
   const selected = all.find((l) => l.id === selectedId) ?? null;
@@ -161,13 +185,9 @@ export function MarketView() {
             label="Type"
             value={type}
             onChange={setType}
-            options={[
-              { value: "all", label: "All types" },
-              { value: "Movie", label: "Movies" },
-              { value: "TV Series", label: "TV Series" },
-              { value: "Anime", label: "Anime" },
-            ]}
+            options={TYPE_OPTIONS}
           />
+          <Select label="Print" value={print} onChange={setPrint} options={PRINT_OPTIONS} />
           {tab === "browse" && (
             <Select
               label="Sort by"
@@ -183,6 +203,14 @@ export function MarketView() {
           )}
         </div>
         <RarityChips value={rarity} onChange={setRarity} />
+        {cardFilter && (
+          <button
+            onClick={() => setCardFilter(null)}
+            className="flex w-fit items-center gap-2 rounded-full bg-accent-500/15 px-3 py-1.5 text-xs font-medium text-accent-200 ring-1 ring-accent-400/30 transition hover:bg-accent-500/25"
+          >
+            Only {filteredCard?.title ?? "this card"} <span aria-hidden>×</span>
+          </button>
+        )}
       </div>
 
       {listings.length === 0 ? (

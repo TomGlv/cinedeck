@@ -3,6 +3,8 @@ import { prisma } from "./db";
 import { isTradeable } from "./economy";
 import { getFranchise } from "./franchises";
 import { getMarketValues, valueKey } from "./market";
+import type { AvatarDTO } from "./packs";
+import { avatarsOf } from "./player";
 
 /* ------------------------------------------------------------------ */
 /*  Leaderboards (registered players only)                             */
@@ -13,6 +15,7 @@ export type Board = "value" | "sets" | "battles";
 export interface LeaderRow {
   rank: number;
   username: string;
+  avatar: AvatarDTO | null;
   score: number;
   /** Secondary figure shown in small: unique cards, combos, battles played */
   detail: number;
@@ -95,15 +98,18 @@ export async function getLeaderboard(board: Board, viewerId: string): Promise<Le
     entry = { at: Date.now(), scores: await computeScores(board) };
     cache.set(board, entry);
   }
+  const myIndex = entry.scores.findIndex((s) => s.playerId === viewerId);
+  const shown = [...entry.scores.slice(0, TOP), ...(myIndex >= TOP ? [entry.scores[myIndex]] : [])];
+  const avatars = await avatarsOf(shown.map((s) => s.playerId));
   const row = (s: Score, i: number): LeaderRow => ({
     rank: i + 1,
     username: s.username,
+    avatar: avatars.get(s.playerId) ?? null,
     score: s.score,
     detail: s.detail,
     isMe: s.playerId === viewerId,
   });
   const rows = entry.scores.slice(0, TOP).map(row);
-  const myIndex = entry.scores.findIndex((s) => s.playerId === viewerId);
 
   return {
     board,

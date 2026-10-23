@@ -1,4 +1,5 @@
 import "server-only";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { snapshotToCard, type CardData, type Rarity } from "./cards";
 import { UPGRADE_MAX_INPUTS, isTradeable, upgradeChance } from "./economy";
@@ -18,8 +19,14 @@ export interface UpgradeTarget {
   stock: number;
 }
 
-/** House copies that aren't listed: supply is limited, so only these can be won. */
-const winnable = { playerId: HOUSE_ID, listing: { is: null } } as const;
+/**
+ * House copies: supply is limited, so only these can be won. The house puts its copies on
+ * the market; one on sale can still be won as long as nobody bid on it (the listing is pulled).
+ */
+const winnable = {
+  playerId: HOUSE_ID,
+  OR: [{ listing: { is: null } }, { listing: { is: { status: "active", currentBid: null } } }],
+} satisfies Prisma.OwnedCardWhereInput;
 
 /** Every card print the house holds, with its market value, cheapest first. */
 export async function getUpgradeTargets(): Promise<UpgradeTarget[]> {
@@ -73,6 +80,11 @@ export async function upgrade(playerId: string, ownedCardIds: string[], targetKe
     });
     if (staked.count !== ids.length) throw new MarketError("Some of these cards are no longer available");
     if (won) {
+      await tx.listing.updateMany({
+        where: { ownedCardId: prize.id, status: "active", currentBid: null },
+        data: { status: "cancelled", ownedCardId: null },
+      });
+      if (await tx.listing.count({ where: { ownedCardId: prize.id } })) throw new MarketError("Someone just bid on that card, try another");
       const moved = await tx.ownedCard.updateMany({
         where: { id: prize.id, ...winnable },
         data: { playerId, pulledAt: new Date() },

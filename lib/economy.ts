@@ -143,12 +143,13 @@ export interface OwnedGroupDTO {
 export interface SetProgressDTO {
   slug: string;
   name: string;
+  description: string;
   cards: { card: CardData; owned: boolean }[];
   owned: number;
   total: number;
   complete: boolean;
   claimed: boolean;
-  bonus: { coinReward: number; coinBoost: number; banner: boolean; rewardCard?: { name: string; description: string } };
+  bonus: { coinReward: number; banner: boolean; rewardCard?: { name: string; description: string } };
 }
 
 export interface ComboProgressDTO {
@@ -160,6 +161,8 @@ export interface ComboProgressDTO {
   target: number;
   reward: number;
   claimed: boolean;
+  /** Later in the chain: unlocks once every combo before it is claimed */
+  locked: boolean;
 }
 
 export interface CollectionDTO {
@@ -184,8 +187,8 @@ export function upgradeChance(stake: number, target: number): number {
   return Math.min(UPGRADE_MAX_CHANCE, (stake / target) * UPGRADE_EDGE);
 }
 
-/** Packs that can be battled (the free pack can't). */
-export const BATTLE_PACKS = ["premium", "blockbuster"] as const;
+/** Packs that can be battled, cheapest first (the free pack can't). Hall of Fame was retired. */
+export const BATTLE_PACKS = ["quickie", "premium", "blockbuster", "boxoffice"] as const;
 export type BattlePack = (typeof BATTLE_PACKS)[number];
 /** classic: highest total value wins · underdog: lowest total value wins */
 export type BattleMode = "classic" | "underdog";
@@ -215,6 +218,10 @@ export interface BattleDTO {
   you?: BattleSide;
   opponent?: BattleSide;
   won?: boolean;
+  /** The creator hasn't watched the replay yet: the lobby hides the result */
+  unseen?: boolean;
+  /** Same total on both sides: a roulette between the two names picked the winner */
+  tie?: boolean;
 }
 
 export interface BattlesDTO {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Crown, Gem, Gift, Lock, Sparkles, TrendingUp, Trophy } from "lucide-react";
+import { Check, Crown, Gem, Gift, Lock, Sparkles, Trophy } from "lucide-react";
 import type { Rarity } from "@/lib/cards";
 import type { ComboProgressDTO, SetProgressDTO } from "@/lib/economy";
 import type { PlayerState } from "@/lib/packs";
@@ -13,7 +13,7 @@ import { usePlayer } from "../PlayerProvider";
 import { CoinAmount, postJson } from "../ui";
 
 const RARITY_BORDER: Record<Rarity, string> = {
-  Mythic: "ring-fuchsia-400",
+  Mythic: "ring-red-500",
   Legendary: "ring-amber-400",
   Rare: "ring-violet-400",
   Common: "ring-zinc-500",
@@ -88,37 +88,52 @@ export function SetsPanel({
         <h2 className="mb-1 flex items-center gap-2 text-xl font-black text-white">
           <Trophy className="h-5 w-5 text-amber-300" /> Combos
         </h2>
-        <p className="mb-5 text-sm text-zinc-400">Collect high-rarity cards to unlock one-time coin rewards.</p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {combos.map((c) => {
+        <p className="mb-5 text-sm text-zinc-400">
+          {combos.length} challenges, easiest first. Claim one to unlock the next.
+        </p>
+
+        {/* Finished ones */}
+        {combos.some((c) => c.claimed) && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {combos
+              .filter((c) => c.claimed)
+              .map((c) => (
+                <span key={c.slug} className="flex items-center gap-1.5 rounded-lg bg-amber-400/10 px-2.5 py-1 text-xs font-semibold text-amber-200 ring-1 ring-amber-400/30">
+                  <Check className="h-3.5 w-3.5" /> {c.name}
+                </span>
+              ))}
+          </div>
+        )}
+
+        {/* The current one */}
+        {combos
+          .filter((c) => !c.claimed && !c.locked)
+          .map((c) => {
             const done = c.progress >= c.target;
             const Icon = c.rarity === "Mythic" ? Crown : Gem;
+            const step = combos.indexOf(c) + 1;
             return (
-              <div
-                key={c.slug}
-                className={`relative overflow-hidden rounded-2xl p-4 ring-1 ${
-                  c.claimed ? "bg-amber-400/10 ring-amber-400/40" : "bg-white/[0.03] ring-white/10"
-                }`}
-              >
+              <div key={c.slug} className="relative overflow-hidden rounded-2xl bg-white/[0.04] p-5 ring-1 ring-white/10">
                 {celebrate === c.slug && (
                   <>
                     <ShockRing rarity="Legendary" />
                     <ParticleBurst rarity="Legendary" />
                   </>
                 )}
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span
-                      className={`rounded-xl p-2 ${c.rarity === "Mythic" ? "bg-fuchsia-500/20 text-fuchsia-300" : "bg-amber-400/20 text-amber-300"}`}
-                    >
+                    <span className={`rounded-xl p-2.5 ring-1 ${RARITY_BORDER[c.rarity]} bg-white/5 text-amber-300`}>
                       <Icon className="h-5 w-5" />
                     </span>
                     <div>
-                      <p className="font-bold text-white">{c.name}</p>
-                      <p className="text-xs text-zinc-400">{c.description}</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                        Combo {step} of {combos.length}
+                      </p>
+                      <p className="text-lg font-bold text-white">{c.name}</p>
+                      <p className="text-sm text-zinc-400">{c.description}</p>
                     </div>
                   </div>
-                  <CoinAmount value={c.reward} className="shrink-0 text-sm" />
+                  <CoinAmount value={c.reward} className="shrink-0 text-base" />
                 </div>
                 <div className="mt-4 flex items-center gap-3">
                   <ProgressBar value={c.progress} max={c.target} gold={done} />
@@ -126,27 +141,34 @@ export function SetsPanel({
                     {c.progress}/{c.target}
                   </span>
                 </div>
-                <div className="mt-3 flex justify-end">
-                  {c.claimed ? (
-                    <span className="flex items-center gap-1 text-xs font-bold text-amber-300">
-                      <Check className="h-4 w-4" /> Claimed
-                    </span>
-                  ) : done ? (
+                {done && (
+                  <div className="mt-4 flex justify-end">
                     <ClaimButton onClick={() => claim(c.slug)} busy={busy === c.slug} label="Claim" />
-                  ) : null}
-                </div>
+                  </div>
+                )}
               </div>
             );
           })}
-        </div>
+
+        {combos.every((c) => c.claimed) ? (
+          <p className="flex items-center gap-2 text-sm font-semibold text-amber-300">
+            <Crown className="h-4 w-4" /> Every combo claimed.
+          </p>
+        ) : (
+          combos.some((c) => c.locked) && (
+            <p className="mt-3 flex items-center gap-2 text-xs text-zinc-500">
+              <Lock className="h-3.5 w-3.5" /> {combos.filter((c) => c.locked).length} more to unlock
+            </p>
+          )
+        )}
       </section>
 
       {/* Franchise binders */}
       <section>
         <h2 className="mb-1 flex items-center gap-2 text-xl font-black text-white">
-          <Sparkles className="h-5 w-5 text-fuchsia-300" /> Franchise sets
+          <Sparkles className="h-5 w-5 text-fuchsia-300" /> Sets
         </h2>
-        <p className="mb-5 text-sm text-zinc-400">Own every film of a saga for a big payout and a permanent free-coin boost.</p>
+        <p className="mb-5 text-sm text-zinc-400">Collect every title of a set for a one-off CineCoins payout.</p>
         <div className="space-y-5">
           {sets.map((s) => (
             <div
@@ -179,12 +201,10 @@ export function SetsPanel({
                     {s.claimed && <Crown className="h-5 w-5 text-amber-300" />}
                     {s.name}
                   </h3>
+                  <p className="mt-0.5 text-sm text-zinc-400">{s.description}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
                     <span className="rounded-full bg-amber-400/10 px-2.5 py-1 ring-1 ring-amber-400/30">
                       <CoinAmount value={s.bonus.coinReward} />
-                    </span>
-                    <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-300 ring-1 ring-emerald-500/30">
-                      <TrendingUp className="h-3.5 w-3.5" /> +{Math.round(s.bonus.coinBoost * 100)}% free coins forever
                     </span>
                     {s.bonus.rewardCard && (
                       <span className="flex items-center gap-1 rounded-full bg-fuchsia-500/10 px-2.5 py-1 font-semibold text-fuchsia-300 ring-1 ring-fuchsia-500/30">

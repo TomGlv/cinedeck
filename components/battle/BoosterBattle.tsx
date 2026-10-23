@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "framer-motion";
 import { Bot, Crown, Eye, Globe, Hourglass, Loader2, RotateCcw, Skull, Swords, Trophy, User, UserPlus, Users, X } from "lucide-react";
 import {
   BATTLE_PACKS,
@@ -42,7 +42,7 @@ const modeLabel = (m: BattleMode) => (m === "classic" ? "Classic" : "Underdog");
 /*  Arena (replay of a finished battle)                                */
 /* ------------------------------------------------------------------ */
 
-function Slot({ side, index, revealed, winning }: { side: BattleSide; index: number; revealed: boolean; winning: boolean }) {
+function Slot({ side, index, revealed, winning, pack }: { side: BattleSide; index: number; revealed: boolean; winning: boolean; pack: BattlePack }) {
   const { card, value } = side.cards[index];
   return (
     <div className="flex flex-col items-center gap-1.5">
@@ -55,7 +55,7 @@ function Slot({ side, index, revealed, winning }: { side: BattleSide; index: num
           transition={{ type: "spring", stiffness: 90, damping: 14 }}
         >
           <div className="absolute inset-0 [backface-visibility:hidden]">
-            <CardBack />
+            <CardBack pack={pack} />
           </div>
           <div className="absolute inset-0 [backface-visibility:hidden] [transform:rotateY(180deg)]">
             <MovieCard card={card} clickable={revealed} />
@@ -73,7 +73,7 @@ function Slot({ side, index, revealed, winning }: { side: BattleSide; index: num
   );
 }
 
-function SideRow({ side, isYou, revealed, wins }: { side: BattleSide; isYou: boolean; revealed: number; wins: boolean[] }) {
+function SideRow({ side, isYou, revealed, wins, pack }: { side: BattleSide; isYou: boolean; revealed: number; wins: boolean[]; pack: BattlePack }) {
   const total = side.cards.slice(0, revealed).reduce((sum, c) => sum + c.value, 0);
   return (
     <div>
@@ -88,16 +88,86 @@ function SideRow({ side, isYou, revealed, wins }: { side: BattleSide; isYou: boo
       </div>
       <div className="grid grid-cols-5 gap-2 sm:gap-3">
         {side.cards.map((_, i) => (
-          <Slot key={i} side={side} index={i} revealed={i < revealed} winning={wins[i]} />
+          <Slot key={i} side={side} index={i} revealed={i < revealed} winning={wins[i]} pack={pack} />
         ))}
       </div>
     </div>
   );
 }
 
+const TILE = 150;
+
+/** Tie breaker: a strip of both names spins under a marker and stops on the winner. */
+function TieRoulette({ you, opponent, youWin, onDone }: { you: string; opponent: string; youWin: boolean; onDone: () => void }) {
+  const reduced = useReducedMotion();
+  const box = useRef<HTMLDivElement>(null);
+  const x = useMotionValue(0);
+  // true = your tile; starts on a random side so the strip isn't predictable
+  const tiles = useMemo(() => {
+    const first = Math.random() < 0.5;
+    return Array.from({ length: 48 }, (_, i) => (i % 2 === 0) === first);
+  }, []);
+
+  useEffect(() => {
+    const w = box.current?.offsetWidth ?? 320;
+    let target = 38;
+    if (tiles[target] !== youWin) target++;
+    const end = w / 2 - (target * TILE + TILE / 2) + (Math.random() - 0.5) * TILE * 0.6;
+    let last = -1;
+    const unsub = x.on("change", (v) => {
+      const i = Math.floor((w / 2 - v) / TILE);
+      if (i !== last) {
+        last = i;
+        sfx.tick();
+      }
+    });
+    const spin = animate(x, end, { duration: reduced ? 0.8 : 4.6, ease: [0.1, 0.7, 0.1, 1] });
+    let timer: ReturnType<typeof setTimeout>;
+    void spin.then(() => {
+      timer = setTimeout(onDone, 700);
+    });
+    return () => {
+      unsub();
+      spin.stop();
+      clearTimeout(timer);
+    };
+    // Spins once per mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="space-y-3 text-center">
+      <p className="text-2xl font-black text-amber-300">Tie! Spinning for the winner...</p>
+      <div ref={box} className="relative overflow-hidden rounded-2xl bg-black/40 py-3 ring-1 ring-white/10">
+        <motion.div className="flex" style={{ x }}>
+          {tiles.map((mine, i) => (
+            <div key={i} className="shrink-0 px-1.5" style={{ width: TILE }}>
+              <div
+                className={`flex h-20 items-center justify-center rounded-xl px-2 text-sm font-black ring-2 ${
+                  mine ? "bg-emerald-500/20 text-emerald-200 ring-emerald-400/50" : "bg-rose-500/20 text-rose-200 ring-rose-400/50"
+                }`}
+              >
+                <span className="truncate">{mine ? you : opponent}</span>
+              </div>
+            </div>
+          ))}
+        </motion.div>
+        {/* Marker */}
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-1 -translate-x-1/2 bg-amber-300 shadow-[0_0_16px_rgba(252,211,77,0.9)]" />
+        <div className="pointer-events-none absolute left-1/2 top-0 h-0 w-0 -translate-x-1/2 border-x-8 border-t-[10px] border-x-transparent border-t-amber-300" />
+        <div className="pointer-events-none absolute bottom-0 left-1/2 h-0 w-0 -translate-x-1/2 border-x-8 border-b-[10px] border-x-transparent border-b-amber-300" />
+        {/* Edge fades */}
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-zinc-950 to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-zinc-950 to-transparent" />
+      </div>
+    </motion.div>
+  );
+}
+
 function Arena({ battle, onClose }: { battle: BattleDTO; onClose: () => void }) {
   const [revealed, setRevealed] = useState(0);
   const [done, setDone] = useState(false);
+  const [rolling, setRolling] = useState(false);
   const skip = useRef(false);
   const you = battle.you!;
   const opponent = battle.opponent!;
@@ -108,26 +178,34 @@ function Arena({ battle, onClose }: { battle: BattleDTO; onClose: () => void }) 
       await sleep(400);
       for (let i = 1; i <= 5 && alive; i++) {
         await sleep(skip.current ? 60 : ROUND_MS);
-        sfx.flip();
+        sfx.flip(i - 1);
         setRevealed(i);
       }
       await sleep(skip.current ? 100 : 800);
       if (!alive) return;
-      if (battle.won) sfx.reveal("Legendary");
-      else sfx.shake();
-      setDone(true);
+      if (battle.tie) setRolling(true);
+      else finish();
     })();
     return () => {
       alive = false;
     };
+    // finish() only reads `battle`, already a dependency
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battle]);
+
+  function finish() {
+    if (battle.won) sfx.reveal("Legendary");
+    else sfx.shake();
+    setRolling(false);
+    setDone(true);
+  }
 
   const better = (a: number, b: number) => (battle.mode === "classic" ? a >= b : a <= b);
   const youWins = you.cards.map((c, i) => better(c.value, opponent.cards[i].value));
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <SideRow side={opponent} isYou={false} revealed={revealed} wins={youWins.map((w) => !w)} />
+      <SideRow side={opponent} isYou={false} revealed={revealed} wins={youWins.map((w) => !w)} pack={battle.pack} />
       <div className="flex items-center gap-4">
         <div className="h-px flex-1 bg-white/10" />
         <span className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-zinc-500">
@@ -135,10 +213,12 @@ function Arena({ battle, onClose }: { battle: BattleDTO; onClose: () => void }) 
         </span>
         <div className="h-px flex-1 bg-white/10" />
       </div>
-      <SideRow side={you} isYou revealed={revealed} wins={youWins} />
+      <SideRow side={you} isYou revealed={revealed} wins={youWins} pack={battle.pack} />
+
+      {rolling && <TieRoulette you={you.name} opponent={opponent.name} youWin={!!battle.won} onDone={finish} />}
 
       <AnimatePresence>
-        {done ? (
+        {rolling ? null : done ? (
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -227,23 +307,32 @@ export function BoosterBattle() {
   const [friend, setFriend] = useState(params.get("friend") ?? "");
   const [busy, setBusy] = useState<string | null>(null);
   const [watching, setWatching] = useState<BattleDTO | null>(null);
-  const prevWaiting = useRef<Set<string> | null>(null);
+  const watchingRef = useRef(watching);
+  watchingRef.current = watching;
+  /** Replays already opened here, so a slow "seen" save can't reopen them */
+  const watched = useRef(new Set<string>());
+
+  const watch = useCallback((b: BattleDTO) => {
+    watched.current.add(b.id);
+    setWatching(b);
+    if (b.isCreator) void postJson("/api/battles", { action: "seen", battleId: b.id });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/battles", { cache: "no-store" });
     if (!res.ok) return;
     const json = (await res.json()) as BattlesDTO;
-    // A lobby of mine that left "waiting" and shows up in recent = someone (or a bot) played it
-    if (prevWaiting.current) {
-      for (const b of json.recent) {
-        if (prevWaiting.current.has(b.id)) push(`${b.opponentName} joined your battle: you ${b.won ? "won" : "lost"}! Watch the replay below.`, b.won ? "success" : "error");
-      }
-    }
-    prevWaiting.current = new Set(json.waiting.map((b) => b.id));
     setData(json);
     setState(json.state);
     if (!friend && json.friends[0]) setFriend(json.friends[0]);
-  }, [push, setState, friend]);
+    // Someone (or a bot) played one of my lobbies: show the replay instead of the result
+    const fresh = json.recent.find((b) => b.unseen && !watched.current.has(b.id));
+    if (fresh && !watchingRef.current) {
+      push(`${fresh.opponentName} accepted your battle!`, "success");
+      watch(fresh);
+    }
+  }, [push, setState, friend, watch]);
 
   useEffect(() => {
     void load();
@@ -263,12 +352,6 @@ export function BoosterBattle() {
     if (res.battle?.status === "done") watch(res.battle);
     else if (res.battle) push(res.battle.invitedName ? `Challenge sent to ${res.battle.invitedName}` : "Lobby open, waiting for an opponent...", "success");
     void load();
-  }
-
-  function watch(b: BattleDTO) {
-    setWatching(b);
-    if (b.isCreator) void postJson("/api/battles", { action: "seen", battleId: b.id });
-    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   if (watching) {
@@ -303,7 +386,7 @@ export function BoosterBattle() {
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Create */}
       <Section title="New battle" icon={Swords}>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {BATTLE_PACKS.map((type) => {
             const def = PACKS[type];
             return (
@@ -392,8 +475,8 @@ export function BoosterBattle() {
           </motion.button>
         </div>
         <p className="mt-3 text-xs text-zinc-500">
-          Both sides open the same pack. Cards are scored at market value, the winner takes all 10 cards. Ties go to whoever opened the
-          battle.
+          Both sides open the same pack. Cards are scored at market value, the winner takes all 10 cards. A tie spins a roulette
+          between both names.
         </p>
       </Section>
 
@@ -483,16 +566,18 @@ export function BoosterBattle() {
                   <p className="flex items-center gap-2 truncate text-sm font-semibold text-white">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
-                        b.won ? "bg-emerald-400 text-black" : "bg-rose-500 text-white"
+                        b.unseen ? "bg-amber-400 text-black" : b.won ? "bg-emerald-400 text-black" : "bg-rose-500 text-white"
                       }`}
                     >
-                      {b.won ? "Won" : "Lost"}
+                      {b.unseen ? "New" : b.won ? "Won" : "Lost"}
                     </span>
                     vs {b.opponent?.name}
                   </p>
                   <p className="text-xs text-zinc-500">
-                    {PACKS[b.pack].name} · {modeLabel(b.mode)} · {b.you?.total.toLocaleString("en-US")} vs{" "}
-                    {b.opponent?.total.toLocaleString("en-US")}
+                    {PACKS[b.pack].name} · {modeLabel(b.mode)}
+                    {b.unseen
+                      ? " · watch to see who won"
+                      : ` · ${b.you?.total.toLocaleString("en-US")} vs ${b.opponent?.total.toLocaleString("en-US")}`}
                   </p>
                 </div>
                 <button

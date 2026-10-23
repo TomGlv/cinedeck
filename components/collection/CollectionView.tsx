@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { Crown, Gavel, Layers, Loader2, Package, Trophy, Zap } from "lucide-react";
-import { RARITY_ORDER, type MediaType, type Rarity } from "@/lib/cards";
+import { RARITY_ORDER, TYPE_OPTIONS, type MediaType, type Rarity } from "@/lib/cards";
 import type { CollectionDTO, OwnedGroupDTO } from "@/lib/economy";
 import { cardKey } from "@/lib/finishes";
 import type { PlayerState } from "@/lib/packs";
@@ -196,12 +196,7 @@ export function CollectionView() {
                   label="Type"
                   value={type}
                   onChange={setType}
-                  options={[
-                    { value: "all", label: "All types" },
-                    { value: "Movie", label: "Movies" },
-                    { value: "TV Series", label: "TV Series" },
-                    { value: "Anime", label: "Anime" },
-                  ]}
+                  options={TYPE_OPTIONS}
                 />
                 <Select label="Sort by" value={sort} onChange={setSort} options={SORTS} />
               </div>

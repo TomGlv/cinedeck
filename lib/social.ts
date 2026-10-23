@@ -5,6 +5,8 @@ import { isTradeable } from "./economy";
 import { cardKey } from "./finishes";
 import { MarketError, getMarketValues } from "./market";
 import { notify } from "./notifications";
+import type { AvatarDTO } from "./packs";
+import { avatarsOf } from "./player";
 
 /* ------------------------------------------------------------------ */
 /*  Friends                                                            */
@@ -12,13 +14,22 @@ import { notify } from "./notifications";
 
 export interface FriendDTO {
   username: string;
+  avatar: AvatarDTO | null;
   since: string;
 }
 
 export interface FriendsDTO {
   friends: FriendDTO[];
-  incoming: { id: string; username: string; sentAt: string }[];
-  outgoing: { id: string; username: string; sentAt: string }[];
+  incoming: { id: string; username: string; avatar: AvatarDTO | null; sentAt: string }[];
+  outgoing: { id: string; username: string; avatar: AvatarDTO | null; sentAt: string }[];
+}
+
+/** Profile picture: one of the player's own cards, or null to go back to the initial. */
+export async function setAvatar(playerId: string, ownedCardId: string | null) {
+  if (ownedCardId && !(await prisma.ownedCard.findFirst({ where: { id: ownedCardId, playerId }, select: { id: true } }))) {
+    throw new MarketError("That card isn't in your collection anymore");
+  }
+  await prisma.player.update({ where: { id: playerId }, data: { avatarCardId: ownedCardId } });
 }
 
 async function requireAccount(playerId: string) {
@@ -54,18 +65,21 @@ export async function getFriends(playerId: string): Promise<FriendsDTO> {
     orderBy: { createdAt: "desc" },
   });
   const other = (r: (typeof rows)[number]) => (r.requesterId === playerId ? r.addressee.username : r.requester.username) ?? "?";
+  const otherId = (r: (typeof rows)[number]) => (r.requesterId === playerId ? r.addresseeId : r.requesterId);
+  const avatars = await avatarsOf(rows.map(otherId));
+  const avatar = (r: (typeof rows)[number]) => avatars.get(otherId(r)) ?? null;
 
   return {
     friends: rows
       .filter((r) => r.status === "accepted")
-      .map((r) => ({ username: other(r), since: r.createdAt.toISOString() }))
+      .map((r) => ({ username: other(r), avatar: avatar(r), since: r.createdAt.toISOString() }))
       .sort((a, b) => a.username.localeCompare(b.username)),
     incoming: rows
       .filter((r) => r.status === "pending" && r.addresseeId === playerId)
-      .map((r) => ({ id: r.id, username: other(r), sentAt: r.createdAt.toISOString() })),
+      .map((r) => ({ id: r.id, username: other(r), avatar: avatar(r), sentAt: r.createdAt.toISOString() })),
     outgoing: rows
       .filter((r) => r.status === "pending" && r.requesterId === playerId)
-      .map((r) => ({ id: r.id, username: other(r), sentAt: r.createdAt.toISOString() })),
+      .map((r) => ({ id: r.id, username: other(r), avatar: avatar(r), sentAt: r.createdAt.toISOString() })),
   };
 }
 
@@ -133,6 +147,7 @@ export async function removeFriend(playerId: string, username: string) {
 /* ------------------------------------------------------------------ */
 
 export interface ProfileDTO {
+  avatar: AvatarDTO | null;
   username: string;
   joinedAt: string;
   isMe: boolean;
@@ -152,7 +167,7 @@ export interface ProfileDTO {
 
 export async function getProfile(viewerId: string, username: string): Promise<ProfileDTO> {
   const p = await findByUsername(username);
-  const [copies, battles, friendship] = await Promise.all([
+  const [copies, battles, friendship, avatars] = await Promise.all([
     prisma.ownedCard.findMany({ where: { playerId: p.id } }),
     prisma.battle.findMany({
       where: { status: "done", OR: [{ creatorId: p.id }, { opponentId: p.id }] },
@@ -166,6 +181,7 @@ export async function getProfile(viewerId: string, username: string): Promise<Pr
         ],
       },
     }),
+    avatarsOf([p.id]),
   ]);
 
   const values = await getMarketValues(copies);
@@ -181,6 +197,7 @@ export async function getProfile(viewerId: string, username: string): Promise<Pr
 
   return {
     username: p.username!,
+    avatar: avatars.get(p.id) ?? null,
     joinedAt: p.createdAt.toISOString(),
     isMe: p.id === viewerId,
     relation: !friendship

@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, Check, Clock, Crown, Flame, Layers, Loader2, Swords, Trophy, UserPlus, Wallet } from "lucide-react";
+import { ArrowLeftRight, Check, Clock, Pencil, Crown, Flame, Layers, Loader2, Swords, Trophy, UserPlus, Wallet } from "lucide-react";
 import { cardKey } from "@/lib/finishes";
 import type { PlayerState } from "@/lib/packs";
 import type { ProfileDTO } from "@/lib/social";
+import { Avatar } from "../Avatar";
+import { OPEN_AVATAR_PICKER } from "./AvatarPicker";
 import { MovieCard } from "../MovieCard";
 import { usePlayer } from "../PlayerProvider";
 import { CoinAmount, ToastStack, postJson, useToasts } from "../ui";
@@ -22,7 +24,7 @@ function Stat({ icon: Icon, label, value }: { icon: typeof Crown; label: string;
 }
 
 export function ProfileView({ username }: { username: string }) {
-  const { setState } = usePlayer();
+  const { state, setState } = usePlayer();
   const { toasts, push } = useToasts();
   const [profile, setProfile] = useState<ProfileDTO | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,11 +61,22 @@ export function ProfileView({ username }: { username: string }) {
     <div className="space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <span className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-2xl font-black uppercase text-white">
-            {profile.username[0]}
-          </span>
+          {profile.isMe ? (
+            <button
+              onClick={() => window.dispatchEvent(new Event(OPEN_AVATAR_PICKER))}
+              aria-label="Change profile picture"
+              className="group relative rounded-[30%] transition active:scale-[0.98]"
+            >
+              <Avatar name={profile.username} avatar={state?.avatar ?? profile.avatar} size="lg" />
+              <span className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-accent-500 text-white ring-2 ring-zinc-950 transition group-hover:scale-110">
+                <Pencil className="h-3.5 w-3.5" />
+              </span>
+            </button>
+          ) : (
+            <Avatar name={profile.username} avatar={profile.avatar} size="lg" />
+          )}
           <div>
-            <h1 className="text-3xl font-black tracking-tight text-white">{profile.username}</h1>
+            <h1 className="font-display text-4xl font-bold leading-none tracking-[-0.03em] text-white sm:text-5xl">{profile.username}</h1>
             <p className="flex items-center gap-1 text-xs text-zinc-500">
               <Clock className="h-3 w-3" /> Joined {new Date(profile.joinedAt).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
             </p>
@@ -84,7 +97,7 @@ export function ProfileView({ username }: { username: string }) {
                 </Link>
                 <Link
                   href={`/trades?with=${encodeURIComponent(profile.username)}`}
-                  className="flex items-center gap-2 rounded-full bg-violet-500 px-4 py-2 text-sm font-bold text-white"
+                  className="flex items-center gap-2 rounded-full bg-accent-500 px-4 py-2 text-sm font-bold text-white"
                 >
                   <ArrowLeftRight className="h-4 w-4" /> Trade
                 </Link>
@@ -92,7 +105,7 @@ export function ProfileView({ username }: { username: string }) {
             ) : profile.relation === "sent" ? (
               <span className="rounded-full bg-white/10 px-4 py-2 text-sm text-zinc-300">Request sent</span>
             ) : (
-              <button onClick={addFriend} className="flex items-center gap-2 rounded-full bg-violet-500 px-4 py-2 text-sm font-bold text-white">
+              <button onClick={addFriend} className="flex items-center gap-2 rounded-full bg-accent-500 px-4 py-2 text-sm font-bold text-white">
                 <UserPlus className="h-4 w-4" /> {profile.relation === "received" ? "Accept friend request" : "Add friend"}
               </button>
             )}

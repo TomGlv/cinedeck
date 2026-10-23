@@ -21,7 +21,7 @@ export const FINISHES: Record<Finish, FinishDef> = {
   normal: { id: "normal", name: "Normal", chance: 0, multiplier: 1, tagline: "" },
   foil: { id: "foil", name: "Foil", chance: 4, multiplier: 2, tagline: "Silver foil print" },
   polychrome: { id: "polychrome", name: "Polychrome", chance: 0.8, multiplier: 5, tagline: "Shifting rainbow print" },
-  negative: { id: "negative", name: "Film Negative", chance: 0.12, multiplier: 15, tagline: "Inverted, one in a thousand" },
+  negative: { id: "negative", name: "Negative", chance: 0.12, multiplier: 15, tagline: "Inverted colours, one in a thousand" },
 };
 
 /** Rarest first, the order the roll checks them in. */
@@ -51,7 +51,8 @@ export function rollFinish(boost = 1): Finish {
 
 /** Identifies a card *and* its print: "movie-11" or "movie-11~polychrome". */
 export function cardKey(card: { id: string; finish?: Finish } | { cardId: string; finish?: string | null }): string {
-  const id = "id" in card ? card.id : card.cardId;
+  // Stored rows (OwnedCard, Listing...) have both: `id` is the row, `cardId` the card
+  const id = "cardId" in card ? card.cardId : card.id;
   const finish = finishOf(card.finish);
   return finish === "normal" ? id : `${id}~${finish}`;
 }

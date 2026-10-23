@@ -1,7 +1,7 @@
 import "server-only";
-import type { Listing, Prisma } from "@prisma/client";
+import { Prisma, type Listing } from "@prisma/client";
 import { prisma } from "./db";
-import { cardToSnapshot, snapshotToCard, type CardSnapshot, type Rarity } from "./cards";
+import { snapshotToCard, type CardSnapshot, type Rarity } from "./cards";
 import {
   LISTING_DURATIONS,
   MAX_PRICE,
@@ -19,9 +19,10 @@ import {
   type Trend,
 } from "./economy";
 import { cardKey, finishMultiplier, finishOf } from "./finishes";
+import { notifyWatchers } from "./favorites";
 import { notify } from "./notifications";
 import { displayNameOf } from "./player";
-import { drawPack, getCardPool } from "./pool";
+import { getCardPool } from "./pool";
 
 /** User-facing failure (bad bid, not enough coins...). Routes turn it into a 400. */
 export class MarketError extends Error {}
@@ -222,27 +223,24 @@ async function seedHistory(card: Valued & { title: string; poster: string | null
  * steady pace and by buying cards (quick sells, auctions, lost battles). Buy every
  * copy of a card and it disappears from the market until someone pulls it again.
  */
+/**
+ * The house holds every card players let go of: quick sells, upgrade stakes and the cards
+ * bots win in battles. It never mints cards; it puts all of them on the market.
+ */
 export const HOUSE_ID = "house";
-/** Packs the house opens per hour of market activity. */
-const HOUSE_PACKS_PER_HOUR = 20;
-/** The house stops opening packs while it holds this many unlisted cards. */
-const HOUSE_STOCK_CAP = 200;
-/** Packs opened on first boot so the market isn't empty. */
-const HOUSE_BOOTSTRAP_PACKS = 24;
+/** Seller name on the house's listings */
+export const HOUSE_SELLER = "CineDeck Market";
+/** House listings stay up this long, then come back and get relisted at the new market price. */
+const HOUSE_LISTING_MS = 6 * HOUR_MS;
+/** Copies listed per tick, so a big quick sell doesn't stall one request. */
+const HOUSE_LISTINGS_PER_TICK = 40;
 
 let houseReady: Promise<void> | null = null;
 
 /** House copies that aren't on the market. */
 const houseStock = { playerId: HOUSE_ID, listing: { is: null } } satisfies Prisma.OwnedCardWhereInput;
 
-async function houseOpensPacks(count: number) {
-  const pool = await getCardPool();
-  if (pool.cards.length === 0 || count <= 0) return;
-  const cards = Array.from({ length: count }, () => drawPack(pool, "free")).flat();
-  await prisma.ownedCard.createMany({ data: cards.map((c) => ({ playerId: HOUSE_ID, ...cardToSnapshot(c) })) });
-}
-
-/** Creates the house, gives pre-supply bot listings a real card, stocks an empty house. Call before moving cards to it. */
+/** Creates the house and gives pre-supply bot listings a real card. Call before moving cards to it. */
 export function ensureHouse(): Promise<void> {
   houseReady ??= (async () => {
     await prisma.player.upsert({ where: { id: HOUSE_ID }, create: { id: HOUSE_ID, isBot: true, cineCoins: 0 }, update: {} });
@@ -252,21 +250,11 @@ export function ensureHouse(): Promise<void> {
       const card = await prisma.ownedCard.create({ data: { playerId: HOUSE_ID, ...snapshotOf(l) } });
       await prisma.listing.update({ where: { id: l.id }, data: { ownedCardId: card.id } });
     }
-
-    if ((await prisma.ownedCard.count({ where: { playerId: HOUSE_ID } })) < 50) await houseOpensPacks(HOUSE_BOOTSTRAP_PACKS);
   })().catch((err) => {
     houseReady = null;
     throw err;
   });
   return houseReady;
-}
-
-async function houseRestock(now: Date) {
-  const elapsed = await claimClock("house-restock", now, 3_600_000 / HOUSE_PACKS_PER_HOUR);
-  if (!elapsed) return;
-  const packs = Math.floor((elapsed / 3_600_000) * HOUSE_PACKS_PER_HOUR);
-  if ((await prisma.ownedCard.count({ where: houseStock })) >= HOUSE_STOCK_CAP) return;
-  await houseOpensPacks(Math.min(packs, 10));
 }
 
 /** How many copies of each card exist, who holds them and how many are listed. */
@@ -331,7 +319,7 @@ async function completeSale(tx: Tx, l: Listing, price: number, buyer: { id: stri
       kind: "sold",
       title: `${l.title} sold for ${price.toLocaleString("en-US")}`,
       body: `${buyer.name} bought it. You received ${afterTax(price).toLocaleString("en-US")} coins after tax.`,
-      link: "/?tab=mine",
+      link: "/market?tab=mine",
     });
   }
   if (auction && buyer.id) {
@@ -362,7 +350,7 @@ async function notifyOutbid(tx: Tx, l: Listing, by: string, boughtOut: boolean) 
     kind: "outbid",
     title: boughtOut ? `${l.title} was bought outright` : `Outbid on ${l.title}`,
     body: boughtOut ? `${by} paid the Buy Now price. Your coins were refunded.` : `${by} took the lead. Your coins were refunded.`,
-    link: "/?tab=bids",
+    link: "/market?tab=bids",
   });
 }
 
@@ -455,8 +443,6 @@ interface BotInterest {
   eagerness: number;
 }
 
-const BOT_LISTING_TARGET = 24;
-const BOT_RARITY_WEIGHTS: Record<Rarity, number> = { Common: 42, Rare: 38, Legendary: 15, Mythic: 5 };
 const BOT_BASE_INTEREST: Record<Rarity, number> = { Common: 1, Rare: 2, Legendary: 3, Mythic: 4 };
 
 /**
@@ -581,51 +567,30 @@ async function finalRound(l: Listing, now: Date): Promise<Listing> {
   return current;
 }
 
-/** Picks unlisted house copies to put on sale, favouring rarer cards when the house has them. */
-async function pickHouseCopies(count: number) {
-  const stock = await prisma.ownedCard.findMany({ where: houseStock });
-  const byRarity = new Map<Rarity, typeof stock>();
-  for (const c of stock) byRarity.set(c.rarity as Rarity, [...(byRarity.get(c.rarity as Rarity) ?? []), c]);
-
-  const picks: typeof stock = [];
-  for (let i = 0; i < count; i++) {
-    const rarities = (Object.keys(BOT_RARITY_WEIGHTS) as Rarity[]).filter((r) => byRarity.get(r)?.length);
-    if (rarities.length === 0) break;
-    const total = rarities.reduce((sum, r) => sum + BOT_RARITY_WEIGHTS[r], 0);
-    let roll = Math.random() * total;
-    const rarity = rarities.find((r) => (roll -= BOT_RARITY_WEIGHTS[r]) < 0) ?? rarities[0];
-    const bucket = byRarity.get(rarity)!;
-    picks.push(bucket.splice(Math.floor(Math.random() * bucket.length), 1)[0]);
-  }
-  return picks;
-}
-
-/** Keeps the market stocked with house copies priced around market value. */
-async function ensureBotListings(now: Date) {
-  const active = await prisma.listing.count({ where: { status: "active", sellerId: null, endsAt: { gt: now } } });
-  const missing = BOT_LISTING_TARGET - active;
-  if (missing <= 0) return;
-
-  const picks = await pickHouseCopies(missing);
-  if (picks.length === 0) return;
-  const values = await getMarketValues(picks);
-
-  for (const c of picks) {
-    const value = values.get(valueKey(c))?.value ?? 50;
-    const sellerName = botName();
-    const startPrice = roundPrice(value * rand(0.45, 0.75));
-    const buyNowPrice = Math.max(startPrice + bidIncrement(startPrice), roundPrice(value * rand(0.95, 1.35)));
-    await prisma.listing.create({
-      data: {
-        ...snapshotOf(c),
-        ownedCardId: c.id,
-        sellerName,
-        startPrice,
-        buyNowPrice,
-        bots: JSON.stringify(makeBotInterest(fundamentalValue(c), c.rarity as Rarity, startPrice, sellerName)),
-        endsAt: new Date(now.getTime() + rand(5, 60) * 60_000),
-      },
-    });
+/** Puts every unlisted house copy on sale at its market value (Buy Now = market price). */
+async function listHouseStock(now: Date) {
+  const stock = await prisma.ownedCard.findMany({ where: houseStock, take: HOUSE_LISTINGS_PER_TICK });
+  if (stock.length === 0) return;
+  const values = await getMarketValues(stock);
+  for (const c of stock) {
+    const price = Math.max(1, roundPrice(values.get(valueKey(c))?.value ?? 50));
+    try {
+      await notifyWatchers(prisma, c, price, null);
+      await prisma.listing.create({
+        data: {
+          ...snapshotOf(c),
+          ownedCardId: c.id,
+          sellerName: HOUSE_SELLER,
+          startPrice: price,
+          buyNowPrice: price,
+          bots: "[]",
+          endsAt: new Date(now.getTime() + HOUSE_LISTING_MS),
+        },
+      });
+    } catch (err) {
+      // Another tick listed this copy first
+      if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
+    }
   }
 }
 
@@ -671,10 +636,9 @@ export async function marketTick(): Promise<void> {
   ticking = (async () => {
     const now = new Date();
     await ensureHouse();
-    await houseRestock(now);
     await simulateBots(now);
     await settleExpired(now);
-    await ensureBotListings(now);
+    await listHouseStock(now);
     await backgroundTrades(now);
   })().finally(() => {
     ticking = null;
@@ -703,6 +667,7 @@ export async function createListing(
     if (!isTradeable(owned.cardId)) throw new MarketError("Reward cards can't be traded");
 
     const sellerName = await displayNameOf(playerId, tx);
+    await notifyWatchers(tx, owned, buyNowPrice, playerId);
     return tx.listing.create({
       data: {
         cardId: owned.cardId,

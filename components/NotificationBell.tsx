@@ -3,14 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeftRight, Bell, CheckCheck, Clock, Coins, Gavel, Swords, Trophy, UserPlus, Users } from "lucide-react";
+import { ArrowLeftRight, Bell, CheckCheck, Clock, Coins, Gavel, Star, Swords, Trophy, UserPlus, Users } from "lucide-react";
 import type { NotificationDTO, NotificationKind } from "@/lib/notifications";
 import type { PlayerState } from "@/lib/packs";
 import { sfx } from "@/lib/sfx";
 import { usePlayer } from "./PlayerProvider";
 import { postJson } from "./ui";
 
-const POLL_MS = 15_000;
+const POLL_MS = 60_000;
 const MARKET_KINDS = new Set<NotificationKind>(["outbid", "won", "sold", "expired"]);
 
 const KIND: Record<NotificationKind, { icon: typeof Bell; color: string }> = {
@@ -19,12 +19,13 @@ const KIND: Record<NotificationKind, { icon: typeof Bell; color: string }> = {
   sold: { icon: Coins, color: "text-amber-300 bg-amber-400/15" },
   expired: { icon: Clock, color: "text-zinc-300 bg-white/10" },
   battle_invite: { icon: Swords, color: "text-amber-300 bg-amber-400/15" },
-  battle_result: { icon: Swords, color: "text-violet-300 bg-violet-500/15" },
-  friend_request: { icon: UserPlus, color: "text-violet-300 bg-violet-500/15" },
+  battle_result: { icon: Swords, color: "text-accent-300 bg-accent-500/15" },
+  friend_request: { icon: UserPlus, color: "text-accent-300 bg-accent-500/15" },
   friend_accepted: { icon: Users, color: "text-emerald-300 bg-emerald-500/15" },
   trade_offer: { icon: ArrowLeftRight, color: "text-fuchsia-300 bg-fuchsia-500/15" },
   trade_accepted: { icon: ArrowLeftRight, color: "text-emerald-300 bg-emerald-500/15" },
   trade_declined: { icon: ArrowLeftRight, color: "text-zinc-300 bg-white/10" },
+  favorite_listed: { icon: Star, color: "text-amber-300 bg-amber-400/15" },
 };
 
 function ago(iso: string): string {

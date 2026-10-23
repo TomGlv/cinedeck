@@ -148,7 +148,7 @@ export function RevealOverlay({ pull, onDone }: { pull: BigPull | null; onDone: 
               background: special
                 ? special.flash
                 : mythic
-                  ? "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(217,70,239,0.55) 35%, rgba(103,232,249,0.2) 60%, transparent 80%)"
+                  ? "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(239,68,68,0.55) 35%, rgba(190,18,60,0.25) 60%, transparent 80%)"
                   : "radial-gradient(circle, rgba(255,247,237,0.85) 0%, rgba(251,191,36,0.4) 40%, transparent 75%)",
             }}
             initial={{ opacity: 0, scale: 0.6 }}
@@ -160,7 +160,7 @@ export function RevealOverlay({ pull, onDone }: { pull: BigPull | null; onDone: 
               special
                 ? `bg-gradient-to-r ${special.text}`
                 : mythic
-                  ? "bg-gradient-to-r from-fuchsia-300 via-cyan-200 to-amber-200"
+                  ? "bg-gradient-to-r from-rose-100 via-red-400 to-rose-600"
                   : "bg-gradient-to-r from-amber-100 via-amber-300 to-yellow-500"
             } bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(255,255,255,0.5)]`}
             initial={{ scale: 2.6, opacity: 0, letterSpacing: "0.5em", filter: "blur(12px)" }}

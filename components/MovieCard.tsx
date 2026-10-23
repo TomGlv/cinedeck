@@ -2,7 +2,7 @@
 
 import { useState, type MouseEvent } from "react";
 import { motion, useMotionTemplate, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Aperture, Clapperboard, Crown, Film, Flame, Gem, Rainbow, Sparkles, Star, Tv, Wand2 } from "lucide-react";
+import { Aperture, Clapperboard, Contrast, Crown, Flame, Gem, Rainbow, Sparkles, Star, Tv, Wand2 } from "lucide-react";
 import type { CardData, MediaType, Rarity } from "@/lib/cards";
 import { FINISHES, type Finish } from "@/lib/finishes";
 import { getFranchise } from "@/lib/franchises";
@@ -10,35 +10,33 @@ import { useCardInfo } from "./card-info";
 
 const RARITY_STYLES: Record<
   Rarity,
-  { frame: string; glow: string; badge: string; icon: typeof Crown; holo: number }
+  { frame: string; glow: string; badge: string; icon: typeof Crown }
 > = {
+  // Ruby foil frame with a thin red halo
   Mythic: {
-    frame: "from-amber-300 via-fuchsia-500 to-violet-500",
-    glow: "shadow-[0_0_45px_-6px_rgba(217,70,239,0.75)]",
-    badge: "bg-gradient-to-r from-amber-300 to-fuchsia-500 text-black",
+    frame: "from-rose-300 via-red-600 to-rose-900",
+    glow: "shadow-[0_0_14px_1px_rgba(239,68,68,0.6)]",
+    badge: "bg-gradient-to-r from-rose-400 to-red-600 text-white",
     icon: Crown,
-    holo: 0.45,
   },
+  // Gold foil frame with a thin gold halo
   Legendary: {
     frame: "from-yellow-200 via-amber-400 to-yellow-600",
-    glow: "shadow-[0_0_35px_-8px_rgba(251,191,36,0.65)]",
+    glow: "shadow-[0_0_14px_1px_rgba(251,191,36,0.55)]",
     badge: "bg-amber-400 text-black",
     icon: Flame,
-    holo: 0.3,
   },
   Rare: {
     frame: "from-violet-400 via-indigo-500 to-violet-700",
     glow: "shadow-[0_0_25px_-10px_rgba(139,92,246,0.7)]",
     badge: "bg-violet-500 text-white",
     icon: Gem,
-    holo: 0,
   },
   Common: {
     frame: "from-zinc-500 via-zinc-400 to-zinc-600",
     glow: "shadow-lg shadow-black/50",
     badge: "bg-zinc-700 text-zinc-100",
     icon: Sparkles,
-    holo: 0,
   },
 };
 
@@ -57,26 +55,14 @@ const FINISH_STYLES: Record<Exclude<Finish, "normal">, { frame: string; glow: st
     icon: Rainbow,
   },
   negative: {
-    frame: "bg-gradient-to-br from-orange-300 via-zinc-950 to-orange-400",
-    glow: "shadow-[0_0_55px_-4px_rgba(251,146,60,0.85)]",
-    badge: "bg-orange-400 text-black",
-    icon: Film,
+    frame: "bg-gradient-to-br from-zinc-100 via-zinc-950 to-indigo-300",
+    glow: "shadow-[0_0_55px_-4px_rgba(129,140,248,0.75)]",
+    badge: "bg-zinc-100 text-black",
+    icon: Contrast,
   },
 };
 
-/** Film-strip sprocket holes down one edge (Film Negative print). */
-function Sprockets({ side }: { side: "left" | "right" }) {
-  return (
-    <div
-      aria-hidden
-      className={`pointer-events-none absolute inset-y-0 ${side === "left" ? "left-0" : "right-0"} z-10 flex w-3 justify-center bg-black/85`}
-    >
-      <div className="h-full w-1.5" style={{ background: "repeating-linear-gradient(to bottom, transparent 0 4px, rgba(254,215,170,0.8) 4px 10px)" }} />
-    </div>
-  );
-}
-
-const TYPE_ICONS: Record<MediaType, typeof Tv> = {
+const TYPE_ICONS: Record<MediaType, typeof Star> = {
   Movie: Clapperboard,
   "TV Series": Tv,
   Anime: Wand2,
@@ -139,8 +125,8 @@ export function MovieCard({ card, clickable = false }: { card: CardData; clickab
               loading="lazy"
               onError={() => setImgFailed(true)}
               className="absolute inset-0 h-full w-full object-cover"
-              // Film Negative: inverted light, hues kept, on an orange film base
-              style={finish === "negative" ? { filter: "invert(1) hue-rotate(180deg) saturate(1.4) contrast(1.05)" } : undefined}
+              // Negative: colours inverted, like Balatro's negative edition
+              style={finish === "negative" ? { filter: "invert(1) contrast(1.15) saturate(1.2)" } : undefined}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-violet-950 via-zinc-900 to-black p-4">
@@ -151,11 +137,11 @@ export function MovieCard({ card, clickable = false }: { card: CardData; clickab
           )}
 
           {finish === "negative" && (
-            <>
-              <div aria-hidden className="pointer-events-none absolute inset-0 bg-orange-500/25 mix-blend-multiply" />
-              <Sprockets side="left" />
-              <Sprockets side="right" />
-            </>
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 mix-blend-color"
+              style={{ background: "linear-gradient(160deg, rgba(76,29,149,0.55), rgba(30,27,75,0.35) 50%, rgba(56,189,248,0.3))" }}
+            />
           )}
 
           {/* Legibility gradients */}
@@ -246,22 +232,7 @@ export function MovieCard({ card, clickable = false }: { card: CardData; clickab
             </>
           )}
           {finish === "negative" && (
-            <div aria-hidden className="finish-sweep pointer-events-none absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-transparent via-orange-200/30 to-transparent" />
-          )}
-          {/* Holographic foil for Legendary / Mythic */}
-          {style.holo > 0 && !finish && (
-            <motion.div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 mix-blend-color-dodge"
-              style={{
-                opacity: style.holo,
-                backgroundImage:
-                  "linear-gradient(115deg, transparent 20%, #f0abfc 35%, #a78bfa 45%, #67e8f9 55%, #fde68a 65%, transparent 80%)",
-                backgroundSize: "250% 250%",
-                backgroundPositionX: shineX,
-                backgroundPositionY: shineY,
-              }}
-            />
+            <div aria-hidden className="finish-sweep pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-indigo-100/25 to-transparent" />
           )}
         </div>
       </motion.div>

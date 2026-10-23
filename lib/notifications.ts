@@ -17,7 +17,8 @@ export type NotificationKind =
   | "friend_accepted"
   | "trade_offer"
   | "trade_accepted"
-  | "trade_declined";
+  | "trade_declined"
+  | "favorite_listed";
 
 export interface NotificationDTO {
   id: string;

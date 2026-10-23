@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowLeftRight, LogOut, User, UserPlus, Users } from "lucide-react";
+import { Avatar } from "../Avatar";
 import { usePlayer } from "../PlayerProvider";
 import { postJson } from "../ui";
 
@@ -28,7 +29,7 @@ export function AccountMenu() {
     return (
       <Link
         href="/login"
-        className="flex items-center gap-1.5 rounded-full bg-violet-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-violet-400"
+        className="flex items-center gap-1.5 rounded-full bg-accent-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-accent-400"
       >
         <UserPlus className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Sign up</span>
       </Link>
@@ -51,9 +52,9 @@ export function AccountMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-label="Account menu"
         aria-expanded={open}
-        className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-sm font-black uppercase text-white"
+        className="relative flex rounded-[30%] transition-transform hover:scale-105 active:scale-95"
       >
-        {state.username[0]}
+        <Avatar name={state.username} avatar={state.avatar} />
         {state.friendRequests + state.tradeOffers > 0 && (
           <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black">
             {state.friendRequests + state.tradeOffers}

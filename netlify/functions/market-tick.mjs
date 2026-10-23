@@ -1,4 +1,4 @@
-// Netlify Scheduled Function: wakes the market every 5 minutes even when nobody is on the
+// Netlify Scheduled Function: wakes the market every 15 minutes even when nobody is on the
 // site, so auctions settle, bots bid, the house restocks and lobbies get their bot.
 // It only pings /api/cron/tick; the work runs in the Next.js app.
 
@@ -13,5 +13,5 @@ export default async () => {
 };
 
 export const config = {
-  schedule: "*/5 * * * *",
+  schedule: "*/15 * * * *",
 };

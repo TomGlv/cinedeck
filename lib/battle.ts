@@ -40,7 +40,7 @@ async function charge(tx: Prisma.TransactionClient, playerId: string, pack: Batt
 
 /**
  * Opens the second pack and settles the battle. The higher total market value wins
- * (lower in underdog mode), ties go to the creator. All 10 cards are minted for the
+ * (lower in underdog mode), a tie is a coin flip shown as a roulette. All 10 cards are minted for the
  * winner, or go to the house when a bot wins. `payer` joins and pays inside the same
  * transaction, so a double join can't charge twice.
  */
@@ -57,7 +57,12 @@ async function resolve(b: Battle, opponent: Opponent, payer: string | null) {
   const opponentValues = valuesOf(opponentCards);
   const creatorTotal = creatorValues.reduce((a, v) => a + v, 0);
   const opponentTotal = opponentValues.reduce((a, v) => a + v, 0);
-  const creatorWins = b.mode === "underdog" ? creatorTotal <= opponentTotal : creatorTotal >= opponentTotal;
+  const creatorWins =
+    creatorTotal === opponentTotal
+      ? Math.random() < 0.5
+      : b.mode === "underdog"
+        ? creatorTotal < opponentTotal
+        : creatorTotal > opponentTotal;
   const winnerId = creatorWins ? b.creatorId : (opponent.id ?? HOUSE_ID);
 
   await prisma.$transaction(async (tx) => {
@@ -81,12 +86,13 @@ async function resolve(b: Battle, opponent: Opponent, payer: string | null) {
     await tx.ownedCard.createMany({
       data: [...creatorCards, ...opponentCards].map((c) => ({ playerId: winnerId, ...cardToSnapshot(c) })),
     });
-    // Instant bot battles are watched live; any other result reaches the creator later
+    // Instant bot battles are watched live; the creator of any other battle watches the replay
+    // later, so the notification keeps the result secret
     if (!b.creatorSeen) {
       await notify(tx, b.creatorId, {
         kind: "battle_result",
-        title: creatorWins ? `You won your battle vs ${opponent.name}` : `You lost your battle vs ${opponent.name}`,
-        body: `${creatorTotal.toLocaleString("en-US")} vs ${opponentTotal.toLocaleString("en-US")}. ${creatorWins ? "All 10 cards are yours." : "Better luck next time."}`,
+        title: `${opponent.name} accepted your battle`,
+        body: `${PACKS[pack].name} · watch the replay to find out who won.`,
         link: "/battles",
       });
     }
@@ -224,6 +230,8 @@ function toDTO(b: FullBattle, viewerId: string): BattleDTO {
     dto.you = isCreator ? creator : opponent;
     dto.opponent = isCreator ? opponent : creator;
     dto.won = (b.winner === "creator") === isCreator;
+    dto.unseen = isCreator && !b.creatorSeen;
+    dto.tie = b.creatorTotal === b.opponentTotal;
   }
   return dto;
 }

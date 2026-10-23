@@ -4,14 +4,58 @@
 
 :root {
   --background: #050505;
-  --foreground: #fafafa;
+  --foreground: #f5f5f5;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   color: var(--foreground);
-  background: radial-gradient(ellipse at top, #2e1065 0%, var(--background) 60%) fixed;
-  min-height: 100vh;
+  /* Two faint glowing orbs on OLED black */
+  background:
+    radial-gradient(40rem 28rem at 12% -6%, rgba(247, 45, 100, 0.13), transparent 70%),
+    radial-gradient(36rem 26rem at 92% 4%, rgba(139, 92, 246, 0.1), transparent 70%),
+    var(--background);
+  background-attachment: fixed;
+  min-height: 100dvh;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Film grain, fixed so it never repaints on scroll */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Thin, precise icon strokes everywhere */
+svg.lucide {
+  stroke-width: 1.6px;
+}
+
+::selection {
+  background: rgba(247, 45, 100, 0.5);
+  color: #fff;
+}
+
+h1,
+h2 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+:focus-visible {
+  outline: 2px solid #ff5c86;
+  outline-offset: 2px;
 }
 
 @keyframes ticker {

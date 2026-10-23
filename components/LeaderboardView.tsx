@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Crown, Layers, Loader2, Medal, Swords, Wallet } from "lucide-react";
 import type { Board, LeaderboardDTO, LeaderRow } from "@/lib/leaderboard";
+import { Avatar } from "./Avatar";
 import { usePlayer } from "./PlayerProvider";
 import { CoinAmount } from "./ui";
 
@@ -23,19 +24,17 @@ function Row({ row, board }: { row: LeaderRow; board: (typeof BOARDS)[number] })
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       className={`flex items-center gap-3 rounded-2xl px-4 py-3 ring-1 ${
-        row.isMe ? "bg-violet-500/15 ring-violet-400/40" : "bg-white/[0.04] ring-white/10"
+        row.isMe ? "bg-accent-500/15 ring-accent-400/40" : "bg-white/[0.04] ring-white/10"
       }`}
     >
       <span className={`flex w-8 shrink-0 justify-center text-sm font-black tabular-nums ${PODIUM[row.rank - 1] ?? "text-zinc-500"}`}>
         {row.rank <= 3 ? <Medal className="h-5 w-5" /> : `#${row.rank}`}
       </span>
       <Link href={`/u/${row.username}`} className="flex min-w-0 flex-1 items-center gap-3 hover:underline">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-black uppercase text-white">
-          {row.username[0]}
-        </span>
+        <Avatar name={row.username} avatar={row.avatar} />
         <span className="truncate font-semibold text-white">
           {row.username}
-          {row.isMe && <span className="ml-2 text-xs font-normal text-violet-300">you</span>}
+          {row.isMe && <span className="ml-2 text-xs font-normal text-accent-300">you</span>}
         </span>
       </Link>
       <span className="hidden text-xs text-zinc-500 sm:inline">
@@ -105,7 +104,7 @@ export function LeaderboardView() {
       {state && !state.username && (
         <p className="mt-6 text-center text-sm text-zinc-500">
           Guests aren&apos;t ranked.{" "}
-          <Link href="/login" className="font-semibold text-violet-300 hover:underline">
+          <Link href="/login" className="font-semibold text-accent-300 hover:underline">
             Create an account
           </Link>{" "}
           to appear on the leaderboards, your cards come with you.

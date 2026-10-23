@@ -26,6 +26,8 @@ const ORDER = [
   "Trade",
   "TradeItem",
   "Clock",
+  "RedeemedCode",
+  "Favorite",
 ];
 
 const prisma = new PrismaClient();

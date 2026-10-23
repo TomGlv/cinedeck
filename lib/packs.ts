@@ -1,10 +1,11 @@
 import type { Rarity } from "./cards";
+import type { Finish } from "./finishes";
 
 /* ------------------------------------------------------------------ */
 /*  Pack definitions & economy (client-safe)                           */
 /* ------------------------------------------------------------------ */
 
-export type PackType = "free" | "premium" | "blockbuster" | "halloween" | "holidays";
+export type PackType = "free" | "premium" | "blockbuster" | "halloween" | "holidays" | "quickie" | "boxoffice" | "halloffame";
 
 /** Relative weights per rarity for one card slot. */
 export type Odds = Record<Rarity, number>;
@@ -30,20 +31,24 @@ export interface PackDef {
   event?: PackEvent;
   /** Multiplies the chance of special finishes (foil, polychrome...) */
   finishBoost?: number;
+  /** Only opened in booster battles, never sold in the shop */
+  battleOnly?: true;
 }
 
 /*
  * Per-pack odds of at least one Legendary+ / Mythic (see chanceAtLeast):
- *   Daily Reel     ~13% / ~2%    (free every 15 min, so a Legendary every ~2h of play)
- *   Director's Cut ~45% / ~8%
- *   Blockbuster    100% / ~19%
+ *   Daily Reel     ~5% / ~0.3%   (free every 15 min, so a Legendary every ~5h of play)
+ *   Director's Cut ~22% / ~1.1%
+ *   Blockbuster    100% / ~3.2%
+ *   Box Office     100% / ~4.9%
+ *   Hall of Fame   100% / ~9.6%
  */
-const STANDARD: Odds = { Common: 78, Rare: 20.2, Legendary: 1.5, Mythic: 0.3 };
-const RARE_PLUS: Odds = { Common: 0, Rare: 94, Legendary: 5, Mythic: 1 };
-const PREMIUM: Odds = { Common: 62, Rare: 31.5, Legendary: 5.5, Mythic: 1 };
-const PREMIUM_HIT: Odds = { Common: 0, Rare: 72, Legendary: 24, Mythic: 4 };
-const BLOCKBUSTER: Odds = { Common: 20, Rare: 66, Legendary: 12, Mythic: 2 };
-const LEGENDARY_PLUS: Odds = { Common: 0, Rare: 0, Legendary: 88, Mythic: 12 };
+const STANDARD: Odds = { Common: 88, Rare: 11.4, Legendary: 0.55, Mythic: 0.05 };
+const RARE_PLUS: Odds = { Common: 0, Rare: 97.4, Legendary: 2.5, Mythic: 0.1 };
+const PREMIUM: Odds = { Common: 75, Rare: 22.5, Legendary: 2.35, Mythic: 0.15 };
+const PREMIUM_HIT: Odds = { Common: 0, Rare: 86, Legendary: 13.5, Mythic: 0.5 };
+const BLOCKBUSTER: Odds = { Common: 35, Rare: 58, Legendary: 6.7, Mythic: 0.3 };
+const LEGENDARY_PLUS: Odds = { Common: 0, Rare: 0, Legendary: 98, Mythic: 2 };
 
 export const PACKS: Record<PackType, PackDef> = {
   free: {
@@ -85,6 +90,30 @@ export const PACKS: Record<PackType, PackDef> = {
     event: { name: "Holidays", from: [12, 10], to: [1, 6], genre: 10751 },
     finishBoost: 3,
   },
+  quickie: {
+    type: "quickie",
+    name: "Matinee",
+    tagline: "5 cards · 1 guaranteed Rare or better",
+    cost: 100,
+    slots: [STANDARD, STANDARD, STANDARD, STANDARD, RARE_PLUS],
+    battleOnly: true,
+  },
+  boxoffice: {
+    type: "boxoffice",
+    name: "Box Office",
+    tagline: "5 cards · 2 guaranteed Legendary or better",
+    cost: 1500,
+    slots: [BLOCKBUSTER, BLOCKBUSTER, BLOCKBUSTER, LEGENDARY_PLUS, LEGENDARY_PLUS],
+    battleOnly: true,
+  },
+  halloffame: {
+    type: "halloffame",
+    name: "Hall of Fame",
+    tagline: "5 cards · all Legendary or better",
+    cost: 5000,
+    slots: [LEGENDARY_PLUS, LEGENDARY_PLUS, LEGENDARY_PLUS, LEGENDARY_PLUS, LEGENDARY_PLUS],
+    battleOnly: true,
+  },
 };
 
 /** Whether `date` falls in the event's yearly window (handles windows over New Year). */
@@ -95,8 +124,9 @@ function inWindow(event: PackEvent, date: Date): boolean {
   return from <= to ? md >= from && md <= to : md >= from || md <= to;
 }
 
+/** Whether the shop sells `pack` right now. */
 export function isPackAvailable(pack: PackDef, date = new Date()): boolean {
-  return !pack.event || inWindow(pack.event, date);
+  return !pack.battleOnly && (!pack.event || inWindow(pack.event, date));
 }
 
 /** End of the current window as a Date (end of the `to` day), for "ends in" countdowns. */
@@ -127,18 +157,27 @@ export function chanceAtLeast(odds: Odds, rarity: Rarity): number {
 /*  Player state shared by API and UI                                  */
 /* ------------------------------------------------------------------ */
 
+/** Profile picture: one of the player's own cards, to show off. */
+export interface AvatarDTO {
+  title: string;
+  poster: string | null;
+  rarity: Rarity;
+  finish: Finish;
+}
+
 export interface PlayerState {
   /** null for guests */
   username: string | null;
+  avatar: AvatarDTO | null;
   /** Username, or Guest-XXXX */
   displayName: string;
   coins: number;
+  /** Redeemed the unlimited code: the balance refills after every spend */
+  unlimited: boolean;
   /** ISO date when the next free pack unlocks; null or past = available now */
   nextFreePackAt: string | null;
   cardCount: number;
   uniqueCount: number;
-  /** Sum of completed-set boosts, e.g. 0.5 = +50% free coins */
-  coinBoost: number;
   /** Incoming friend requests awaiting an answer */
   friendRequests: number;
   /** Battle invites plus finished battles the player hasn't watched */

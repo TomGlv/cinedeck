@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "framer-motion";
 import { ChevronsUp, Loader2, X } from "lucide-react";
@@ -107,6 +107,24 @@ export function Upgrader() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The house's stock moves all the time (market bots, other players' upgrades): refresh the
+  // targets so the list never offers a card with no copy left
+  const loadTargets = useCallback(async () => {
+    const res = await fetch("/api/upgrade", { cache: "no-store" });
+    if (res.ok) setTargets(((await res.json()) as { targets: Target[] }).targets);
+  }, []);
+  const spinningRef = useRef(false);
+  spinningRef.current = spinning;
+  useEffect(() => {
+    const id = setInterval(() => !spinningRef.current && void loadTargets(), 15_000);
+    return () => clearInterval(id);
+  }, [loadTargets]);
+
+  // The picked target sold out: drop it
+  useEffect(() => {
+    if (targetId && targets && !targets.some((t) => t.key === targetId)) setTargetId(null);
+  }, [targets, targetId]);
+
   const byId = useMemo(() => new Map((copies ?? []).map((c) => [c.id, c])), [copies]);
   const stake = picked.reduce((sum, id) => sum + (byId.get(id)?.value ?? 0), 0);
   const target = targets?.find((t) => t.key === targetId) ?? null;
@@ -151,6 +169,7 @@ export function Upgrader() {
       setSpinning(false);
       push(res.error ?? "Upgrade failed", "error");
       if (res.state) setState(res.state);
+      void loadTargets();
       return;
     }
 

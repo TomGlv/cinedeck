@@ -5,6 +5,21 @@ import { finishOf, type Finish } from "./finishes";
 /* ------------------------------------------------------------------ */
 
 export type MediaType = "Movie" | "TV Series" | "Anime";
+
+export const MEDIA_TYPES: MediaType[] = ["Movie", "TV Series", "Anime"];
+
+/** Plural labels for filters. */
+export const TYPE_LABELS: Record<MediaType, string> = {
+  Movie: "Movies",
+  "TV Series": "Series",
+  Anime: "Anime",
+};
+
+/** Options for a type <Select>, "all" first. */
+export const TYPE_OPTIONS: { value: MediaType | "all"; label: string }[] = [
+  { value: "all", label: "All types" },
+  ...MEDIA_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] })),
+];
 export type Rarity = "Mythic" | "Legendary" | "Rare" | "Common";
 
 export const RARITY_ORDER: Record<Rarity, number> = {

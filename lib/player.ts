@@ -3,9 +3,11 @@ import { randomBytes, scrypt as scryptCb, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import { cookies } from "next/headers";
 import { Prisma, type Player } from "@prisma/client";
+import { topUp } from "./codes";
 import { prisma } from "./db";
-import { getFranchise } from "./franchises";
-import { FREE_PACK_COOLDOWN_MS, type PlayerState } from "./packs";
+import type { Rarity } from "./cards";
+import { finishOf } from "./finishes";
+import { FREE_PACK_COOLDOWN_MS, type AvatarDTO, type PlayerState } from "./packs";
 
 const scrypt = promisify(scryptCb) as (password: string, salt: Buffer, keylen: number) => Promise<Buffer>;
 
@@ -130,34 +132,50 @@ export async function logout() {
 /*  State                                                              */
 /* ------------------------------------------------------------------ */
 
-export async function getCoinBoost(playerId: string): Promise<number> {
-  const sets = await prisma.completedSet.findMany({ where: { playerId }, select: { slug: true } });
-  return sets.reduce((sum, s) => sum + (getFranchise(s.slug)?.bonus.coinBoost ?? 0), 0);
+/** Profile pictures of these players, skipping cards they no longer own. */
+export async function avatarsOf(playerIds: string[]): Promise<Map<string, AvatarDTO>> {
+  const players = await prisma.player.findMany({
+    where: { id: { in: playerIds }, avatarCardId: { not: null } },
+    select: { id: true, avatarCardId: true },
+  });
+  const out = new Map<string, AvatarDTO>();
+  if (players.length === 0) return out;
+  const cards = await prisma.ownedCard.findMany({ where: { id: { in: players.map((p) => p.avatarCardId!) } } });
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  for (const p of players) {
+    const c = byId.get(p.avatarCardId!);
+    if (!c || c.playerId !== p.id) continue;
+    const finish = finishOf(c.finish);
+    out.set(p.id, { title: c.title, poster: c.poster, rarity: c.rarity as Rarity, finish });
+  }
+  return out;
 }
 
 export async function getPlayerState(playerId: string): Promise<PlayerState> {
-  const [player, cardCount, unique, coinBoost, friendRequests, battleInvites, battleResults, notifications, tradeOffers] = await Promise.all([
+  await topUp(playerId);
+  const [player, cardCount, unique, friendRequests, battleInvites, battleResults, notifications, tradeOffers, avatars] = await Promise.all([
     prisma.player.findUniqueOrThrow({ where: { id: playerId } }),
     prisma.ownedCard.count({ where: { playerId } }),
     prisma.ownedCard.findMany({ where: { playerId }, distinct: ["cardId"], select: { cardId: true } }),
-    getCoinBoost(playerId),
     prisma.friendship.count({ where: { addresseeId: playerId, status: "pending" } }),
     prisma.battle.count({ where: { invitedId: playerId, status: "open" } }),
     prisma.battle.count({ where: { creatorId: playerId, status: "done", creatorSeen: false } }),
     prisma.notification.count({ where: { playerId, read: false } }),
     prisma.trade.count({ where: { receiverId: playerId, status: "pending" } }),
+    avatarsOf([playerId]),
   ]);
 
   return {
     username: player.username,
+    avatar: avatars.get(playerId) ?? null,
     displayName: displayName(player),
     coins: player.cineCoins,
+    unlimited: player.unlimitedCoins,
     nextFreePackAt: player.lastFreePackAt
       ? new Date(player.lastFreePackAt.getTime() + FREE_PACK_COOLDOWN_MS).toISOString()
       : null,
     cardCount,
     uniqueCount: unique.length,
-    coinBoost,
     friendRequests,
     battleAlerts: battleInvites + battleResults,
     notifications,

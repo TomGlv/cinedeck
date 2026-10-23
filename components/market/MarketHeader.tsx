@@ -6,9 +6,10 @@ import type { Rarity } from "@/lib/cards";
 import type { MarketStats, SaleDTO } from "@/lib/economy";
 import { formatCountdown, useCountdown, usePlayer } from "../PlayerProvider";
 import { CoinAmount } from "../ui";
+import { PageHeader } from "../PageHeader";
 
 const RARITY_TEXT: Record<Rarity, string> = {
-  Mythic: "text-fuchsia-300",
+  Mythic: "text-red-300",
   Legendary: "text-amber-300",
   Rare: "text-violet-300",
   Common: "text-zinc-400",
@@ -66,15 +67,10 @@ export function MarketHeader({ stats, recentSales }: { stats: MarketStats; recen
   return (
     <header className="mb-8 space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="bg-gradient-to-r from-amber-200 via-amber-400 to-fuchsia-400 bg-clip-text text-4xl font-black tracking-tight text-transparent">
-            Transfer Market
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-zinc-400">
-            Bid, buy and sell film, series and anime cards. Set a max bid and we defend your lead. Prices follow real trades, every sale is
-            taxed 5%.
-          </p>
-        </div>
+        <PageHeader kicker="Transfer market" title="The market" className="mb-0">
+          Buy at market price, bid on other players&apos; cards, sell your own. Set a max bid and we defend your lead. Prices follow real
+          trades, every sale is taxed 5%.
+        </PageHeader>
         <div className="flex flex-wrap gap-2">
           <Link
             href="/packs"

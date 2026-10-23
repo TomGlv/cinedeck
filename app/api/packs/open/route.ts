@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { cardToSnapshot } from "@/lib/cards";
 import { prisma } from "@/lib/db";
 import { FREE_PACK_COINS, FREE_PACK_COOLDOWN_MS, PACKS, isPackAvailable, type PackType } from "@/lib/packs";
-import { getCoinBoost, getOrCreatePlayer, getPlayerState } from "@/lib/player";
+import { getOrCreatePlayer, getPlayerState } from "@/lib/player";
 import { drawPack, getPoolFor } from "@/lib/pool";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   // Conditional updates make double-clicks and parallel requests safe
   if (type === "free") {
-    coinsEarned = Math.round(FREE_PACK_COINS * (1 + (await getCoinBoost(player.id))));
+    coinsEarned = FREE_PACK_COINS;
     const cutoff = new Date(Date.now() - FREE_PACK_COOLDOWN_MS);
     const claimed = await prisma.player.updateMany({
       where: { id: player.id, OR: [{ lastFreePackAt: null }, { lastFreePackAt: { lte: cutoff } }] },

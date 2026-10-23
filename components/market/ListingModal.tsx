@@ -253,7 +253,7 @@ function Content({ listing: l, now, onDone }: { listing: ListingDTO; now: number
               <button
                 onClick={() => act("bid", { max })}
                 disabled={busy || max < floor || maxTooHigh || cantAfford}
-                className="flex items-center justify-center gap-2 rounded-full bg-violet-500 px-5 py-3 text-sm font-bold text-white hover:bg-violet-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+                className="flex items-center justify-center gap-2 rounded-full bg-accent-500 px-5 py-3 text-sm font-bold text-white hover:bg-accent-400 disabled:bg-zinc-800 disabled:text-zinc-500"
               >
                 <Gavel className="h-4 w-4" />
                 {maxTooHigh
