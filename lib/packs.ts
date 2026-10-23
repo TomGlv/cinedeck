@@ -37,18 +37,20 @@ export interface PackDef {
 
 /*
  * Per-pack odds of at least one Legendary+ / Mythic (see chanceAtLeast):
- *   Daily Reel     ~5% / ~0.3%   (free every 15 min, so a Legendary every ~5h of play)
- *   Director's Cut ~22% / ~1.1%
- *   Blockbuster    100% / ~3.2%
- *   Box Office     100% / ~4.9%
- *   Hall of Fame   100% / ~9.6%
+ *   Daily Reel     ~10% / ~1.8%   (free every 15 min, so a Legendary every ~2.5h of play)
+ *   Director's Cut ~35% / ~5.7%
+ *   Blockbuster    100% / ~12%
+ *   Box Office     100% / ~18%
+ *   Hall of Fame   100% / ~34%
+ * The pool holds about as many Mythic and Legendary titles as Rare ones (~50 / ~65 / ~90),
+ * so these odds keep any one Mythic about as hard to pull as before.
  */
-const STANDARD: Odds = { Common: 88, Rare: 11.4, Legendary: 0.55, Mythic: 0.05 };
-const RARE_PLUS: Odds = { Common: 0, Rare: 97.4, Legendary: 2.5, Mythic: 0.1 };
-const PREMIUM: Odds = { Common: 75, Rare: 22.5, Legendary: 2.35, Mythic: 0.15 };
-const PREMIUM_HIT: Odds = { Common: 0, Rare: 86, Legendary: 13.5, Mythic: 0.5 };
-const BLOCKBUSTER: Odds = { Common: 35, Rare: 58, Legendary: 6.7, Mythic: 0.3 };
-const LEGENDARY_PLUS: Odds = { Common: 0, Rare: 0, Legendary: 98, Mythic: 2 };
+const STANDARD: Odds = { Common: 82, Rare: 16.6, Legendary: 1.15, Mythic: 0.25 };
+const RARE_PLUS: Odds = { Common: 0, Rare: 95.5, Legendary: 3.7, Mythic: 0.8 };
+const PREMIUM: Odds = { Common: 66, Rare: 29.5, Legendary: 3.8, Mythic: 0.7 };
+const PREMIUM_HIT: Odds = { Common: 0, Rare: 78, Legendary: 19, Mythic: 3 };
+const BLOCKBUSTER: Odds = { Common: 25, Rare: 65, Legendary: 8.8, Mythic: 1.2 };
+const LEGENDARY_PLUS: Odds = { Common: 0, Rare: 0, Legendary: 92, Mythic: 8 };
 
 export const PACKS: Record<PackType, PackDef> = {
   free: {
